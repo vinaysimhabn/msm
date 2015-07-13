@@ -139,30 +139,30 @@ void iommu_set_fault_handler(struct iommu_domain *domain,
 }
 EXPORT_SYMBOL_GPL(iommu_set_fault_handler);
 
-struct iommu_domain *iommu_domain_alloc(struct bus_type *bus, int flags)
+struct iommu_domain *iommu_domain_alloc_flags(struct bus_type *bus, int flags)
 {
-	struct iommu_domain *domain;
-	int ret;
+        struct iommu_domain *domain;
+        int ret;
 
-	if (bus == NULL || bus->iommu_ops == NULL)
-		return NULL;
+        if (bus == NULL || bus->iommu_ops == NULL)
+                return NULL;
 
-	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
-	if (!domain)
-		return NULL;
+        domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+        if (!domain)
+                return NULL;
 
-	domain->ops = bus->iommu_ops;
+        domain->ops = bus->iommu_ops;
 
-	ret = domain->ops->domain_init(domain, flags);
-	if (ret)
-		goto out_free;
+        ret = domain->ops->domain_init(domain, flags);
+        if (ret)
+                goto out_free;
 
-	return domain;
+        return domain;
 
 out_free:
-	kfree(domain);
+        kfree(domain);
 
-	return NULL;
+        return NULL;
 }
 EXPORT_SYMBOL_GPL(iommu_domain_alloc);
 
