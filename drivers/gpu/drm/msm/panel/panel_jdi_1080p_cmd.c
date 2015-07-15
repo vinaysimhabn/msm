@@ -1,0 +1,382 @@
+/*
+ * Copyright (C) 2014 InforceComputing 
+ * Author: Vinay Simha BN <vinaysimha@inforcecomputing.com>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+#include <linux/gpio.h>
+#include <linux/regulator/msm-gpio-regulator.h>
+#include <linux/mfd/pm8xxx/pm8921.h>
+#include <linux/mfd/pm8xxx/pm8821.h>
+
+#include "panel.h"
+
+#define PM8921_GPIO_BASE                NR_GPIO_IRQS
+#define PM8921_GPIO_PM_TO_SYS(pm_gpio)  (pm_gpio - 1 + PM8921_GPIO_BASE)
+#define PM8921_MPP_BASE                 (PM8921_GPIO_BASE + PM8921_NR_GPIOS)
+#define PM8921_MPP_PM_TO_SYS(pm_mpp)    (pm_mpp - 1 + PM8921_MPP_BASE)
+#define PM8921_IRQ_BASE                 (NR_MSM_IRQS + NR_GPIO_IRQS)
+
+#define PM8821_MPP_BASE                 (PM8921_MPP_BASE + PM8921_NR_MPPS)
+#define PM8821_MPP_PM_TO_SYS(pm_mpp)    (pm_mpp - 1 + PM8821_MPP_BASE)
+
+struct panel_jdi {
+	struct panel base;
+	struct mipi_adapter *mipi;
+	struct regulator *reg_l11_avdd;
+	struct regulator *reg_lvs7_vddio;
+	struct regulator *reg_l17;
+	struct regulator *reg_lvs5;
+	int pmic8921_23; /* panel VCC */
+	int gpio_LCM_XRES_SR2; /* JDI reset pin */
+};
+#define to_panel_jdi(x) container_of(x, struct panel_jdi, base)
+
+static char enter_sleep[2] = {0x10, 0x00};
+//-------------------- sleep out --------------------//
+static char write_memory105[1]={0x11};
+//delay1m{200};
+static char pixels_on[1]={0x23};/* For testing , all pixel on*/
+
+static char write_memory106[1]={0x29};
+
+static void panel_jdi_destroy(struct panel *panel)
+{
+	struct panel_jdi *panel_jdi = to_panel_jdi(panel);
+	kfree(panel_jdi);
+}
+
+static int panel_jdi_power_on(struct panel *panel)
+{
+	struct drm_device *dev = panel->dev;
+	struct panel_jdi *panel_jdi = to_panel_jdi(panel);
+	int ret = 0;
+
+	ret = regulator_set_optimum_mode(panel_jdi->reg_l11_avdd, 110000);
+	if (ret < 0) {
+		dev_err(dev->dev, "failed to set l11 mode: %d\n", ret);
+		goto fail1;
+	}
+	
+	ret = regulator_enable(panel_jdi->reg_l11_avdd);
+	if (ret) {
+		dev_err(dev->dev, "failed to enable l11: %d\n", ret);
+		goto fail1;
+	}
+
+	ret = regulator_enable(panel_jdi->reg_l17);
+        if (ret) {
+                dev_err(dev->dev, "failed to enable l17: %d\n", ret);
+                goto fail1;
+        }
+
+	udelay(100);
+
+	ret = regulator_enable(panel_jdi->reg_lvs7_vddio);
+	if (ret) {
+		dev_err(dev->dev, "failed to enable lvs7: %d\n", ret);
+		goto fail2;
+	}
+	ret = regulator_enable(panel_jdi->reg_lvs5);
+	if (ret) {
+		dev_err(dev->dev, "failed to enable lvs5: %d\n", ret);
+		goto fail2;
+	}
+	mdelay(2);
+	gpio_set_value_cansleep(panel_jdi->pmic8921_23, 1);
+	gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
+        mdelay(1);
+        gpio_set_value_cansleep(panel_jdi->pmic8921_23, 0);
+        gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 0);
+        usleep(50);
+        gpio_set_value_cansleep(panel_jdi->pmic8921_23, 1);
+        gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
+
+	return 0;
+
+fail2:
+	regulator_disable(panel_jdi->reg_lvs7_vddio);
+fail1:
+	regulator_disable(panel_jdi->reg_l11_avdd);
+	
+	return ret;
+}
+
+static int panel_jdi_power_off(struct panel *panel)
+{
+	struct drm_device *dev = panel->dev;
+	struct panel_jdi *panel_jdi = to_panel_jdi(panel);
+	int ret;
+
+	gpio_set_value_cansleep(panel_jdi->pmic8921_23, 0);
+	udelay(100);
+	gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 0);
+	udelay(100);
+
+	ret = regulator_disable(panel_jdi->reg_l11_avdd);
+	if (ret)
+		dev_err(dev->dev, "failed to disable l8: %d\n", ret);
+
+	udelay(100);
+
+	ret = regulator_disable(panel_jdi->reg_lvs7_vddio);
+	if (ret)
+		dev_err(dev->dev, "failed to disable lvs7: %d\n", ret);
+
+	ret = regulator_disable(panel_jdi->reg_l17);
+	if (ret)
+		dev_err(dev->dev, "failed to disable l17: %d\n", ret);
+
+	ret = regulator_disable(panel_jdi->reg_lvs5);
+	if (ret)
+		dev_err(dev->dev, "failed to disable lvs5: %d\n", ret);
+
+	return 0;
+}
+
+static int panel_jdi_on(struct panel *panel)
+{
+	struct panel_jdi *panel_jdi = to_panel_jdi(panel);
+	struct mipi_adapter *mipi = panel_jdi->mipi;
+	int ret = 0;
+
+	DRM_DEBUG_KMS("panel on\n");
+
+	ret = panel_jdi_power_on(panel);
+	if (ret)
+		return ret;
+
+	mipi_set_panel_config(mipi, &(struct mipi_panel_config){
+		.cmd_mode = false,
+		.format = DST_FORMAT_RGB888,
+		.traffic_mode = NON_BURST_SYNCH_EVENT,
+		.bllp_power_stop = true,
+		.eof_bllp_power_stop = true,
+		.hsa_power_stop = false,
+		.hbp_power_stop = true,
+		.hfp_power_stop = true,
+		.pulse_mode_hsa_he = true,
+		.rgb_swap = SWAP_RGB,
+		.interleave_max = 0,
+		.dma_trigger = TRIGGER_SW,
+		.mdp_trigger = TRIGGER_NONE,
+		.te = false,
+		.dlane_swap = 0,
+		.t_clk_pre = 0x1c,
+		.t_clk_post = 0x04,
+		.rx_eot_ignore = false,
+		.tx_eot_append = true,
+		.ecc_check = false,
+		.crc_check = false,
+		.phy = {
+			/* regulator */
+			{0x03, 0x0a, 0x04, 0x00, 0x20},
+		        /* timing   */
+		        {0x66, 0x26, 0x38, 0x00, 0x3e, 0xe6, 0x1e, 0x9b,
+			0x3e, 0x03, 0x04, 0xa0},
+			/* phy ctrl */
+		        {0x5f, 0x00, 0x00, 0x10},
+		        /* strength */
+		        {0xff, 0x00, 0x06, 0x00},
+		        /* pll control */
+			{0x00, /*common 8064*/
+                         0xf3, 0x31, 0xda, /* panel specific */
+                         0x00, 0x10, 0x0f, 0x62, /*panel specific */
+                         0x70, 0x07, 0x01,
+                         0x00, 0x14, 0x03, 0x00, 0x02, /*common 8064*/
+                         0x0e, 0x01, 0x00, 0x01}, /* common 8064*/
+
+		},
+	});
+
+	mipi_set_bus_config(mipi, &(struct mipi_bus_config){
+		.low_power = false,
+		.lanes = 0xf,
+	});
+
+	mipi_on(mipi);
+	mipi_dcs_swrite(mipi, true, 0, false,write_memory105[0]); 
+        mdelay(20);
+        mipi_dcs_swrite(mipi, true, 0, false, write_memory106[0]);
+        mdelay(5);
+
+//if(0)
+{
+        /*ALL pixels on*/
+        mipi_dcs_swrite(mipi, true, 0, false, pixels_on[0]);
+        mdelay(5);
+}
+
+	
+	return 0;
+}
+
+static int panel_jdi_off(struct panel *panel)
+{
+	struct panel_jdi *panel_jdi = to_panel_jdi(panel);
+	struct mipi_adapter *mipi = panel_jdi->mipi;
+	int ret;
+
+	DRM_DEBUG_KMS("panel off\n");
+	mipi_set_bus_config(mipi, &(struct mipi_bus_config){
+		.low_power = true,
+		.lanes = 0xf,
+	});
+
+	mipi_dcs_swrite(mipi, true, 0, false, enter_sleep[0]);
+	mdelay(5);
+
+	mipi_off(mipi);
+
+	ret = panel_jdi_power_off(panel);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static struct drm_display_mode *panel_jdi_mode(struct panel *panel)
+{
+	struct drm_display_mode *mode = drm_mode_create(panel->dev);
+
+	snprintf(mode->name, sizeof(mode->name), "1920x1200");
+
+	mode->clock = 1000000;
+
+	mode->hdisplay = 1920;
+	mode->hsync_start = mode->hdisplay + 60;
+	mode->hsync_end = mode->hsync_start + 48;
+	mode->htotal = mode->hsync_end + 32;
+
+	mode->vdisplay = 1200;
+	mode->vsync_start = mode->vdisplay + 6;
+	mode->vsync_end = mode->vsync_start + 3;
+	mode->vtotal = mode->vsync_end + 5;
+
+	mode->flags = 0;
+
+	return mode;
+}
+
+static const struct panel_funcs panel_jdi_funcs = {
+		.destroy = panel_jdi_destroy,
+		.on = panel_jdi_on,
+		.off = panel_jdi_off,
+		.mode = panel_jdi_mode,
+};
+
+struct panel *panel_jdi_1080p_init(struct drm_device *dev,
+		// XXX uggg.. maybe we should just pass in a config structure
+		// pre-populated with regulators, gpio's, etc??  the panel
+		// needs the drm device, but we need the pdev to lookup the
+		// regulators, etc, currently.. and for msm the pdev is different
+		// device from the drm device..
+		struct platform_device *pdev,
+		struct mipi_adapter *mipi)
+{
+	struct panel_jdi *panel_jdi;
+	struct panel *panel = NULL;
+	int ret;
+
+	panel_jdi = kzalloc(sizeof(*panel_jdi), GFP_KERNEL);
+	if (!panel_jdi) {
+		ret = -ENOMEM;
+		goto fail;
+	}
+
+	panel_jdi->mipi = mipi;
+
+	panel = &panel_jdi->base;
+	ret = panel_init(dev, panel, &panel_jdi_funcs);
+	if (ret)
+		goto fail;
+
+	/* Maybe GPIO/regulator/etc stuff should come from DT or similar..
+	 * but we can sort that out when there is some other device that
+	 * uses the same panel.
+	 */
+
+	panel_jdi->pmic8921_23 = PM8921_GPIO_PM_TO_SYS(23);
+	ret = gpio_request(panel_jdi->pmic8921_23, "EN_VDD_BL");
+	if (ret) {
+		dev_err(dev->dev, "failed to request EN_VDD_BL : %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_export(panel_jdi->pmic8921_23, true);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio export mpp: %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_direction_output(panel_jdi->pmic8921_23, 0);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio direction output mpp: %d\n", ret);
+		goto fail;
+	}
+	
+	panel_jdi->gpio_LCM_XRES_SR2 = 54;
+	ret = gpio_request(panel_jdi->gpio_LCM_XRES_SR2, "LCM_XRES");
+	if (ret) {
+		dev_err(dev->dev, "failed to request LCM_XRES : %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_export(panel_jdi->gpio_LCM_XRES_SR2, true);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio export mpp: %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_direction_output(panel_jdi->gpio_LCM_XRES_SR2, 0);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio direction output mpp: %d\n", ret);
+		goto fail;
+	}
+
+	panel_jdi->reg_l11_avdd = devm_regulator_get(dev->dev, "dsi1_avdd");
+	if (IS_ERR(panel_jdi->reg_l11_avdd)) {
+		ret = PTR_ERR(panel_jdi->reg_l11_avdd);
+		dev_err(dev->dev, "failed to request dsi_avdd regulator: %d\n", ret);
+		goto fail;
+	}
+
+	panel_jdi->reg_lvs7_vddio = devm_regulator_get(dev->dev, "dsi1_vddio");
+	if (IS_ERR(panel_jdi->reg_lvs7_vddio)) {
+		ret = PTR_ERR(panel_jdi->reg_lvs7_vddio);
+		dev_err(dev->dev, "failed to request dsi1__vddio regulator: %d\n", ret);
+		goto fail;
+	}
+
+	panel_jdi->reg_l17 = devm_regulator_get(dev->dev, "pwm_power");
+	if (IS_ERR(panel_jdi->reg_l17)) {
+		ret = PTR_ERR(panel_jdi->reg_l17);
+		dev_err(dev->dev, "failed to request pwm_power regulator: %d\n", ret);
+		goto fail;
+	}
+	
+	panel_jdi->reg_lvs5 = devm_regulator_get(dev->dev, "JDI_IOVCC");
+	if (IS_ERR(panel_jdi->reg_lvs5)) {
+		ret = PTR_ERR(panel_jdi->reg_lvs5);
+		dev_err(dev->dev, "failed to request lvs5 regulator: %d\n", ret);
+		goto fail;
+	}
+
+	ret = regulator_set_voltage(panel_jdi->reg_l11_avdd,  3000000, 3000000);
+	if (ret) {
+		dev_err(dev->dev, "set_voltage l8 failed: %d\n", ret);
+		goto fail;
+	}
+
+	return panel;
+fail:
+	if (panel)
+		panel_jdi_destroy(panel);
+	return ERR_PTR(ret);
+}

@@ -32,7 +32,7 @@ msm-y := \
 	mdp/mdp4/mdp4_kms.o \
 	mdp/mdp4/mdp4_plane.o \
         panel/panel.o \
-        panel/panel_truly.o \
+        panel/panel_jdi_1080p_cmd.o \
 	mdp/mdp5/mdp5_crtc.o \
 	mdp/mdp5/mdp5_encoder.o \
 	mdp/mdp5/mdp5_irq.o \

@@ -101,6 +101,8 @@
 #include <linux/nfc/bcm2079x.h>
 #endif
 
+#include <linux/pwm_backlight.h>
+
 #define NFC_GPIO_VEN PM8921_GPIO_PM_TO_SYS(9)
 #define NFC_GPIO_WAKE PM8921_GPIO_PM_TO_SYS(8)
 #define NFC_GPIO_IRQ 32
@@ -3292,6 +3294,22 @@ static void __init add_i2c_anx7808_device(void)
 }
 #endif
 
+/* PWM controlled backlight */
+static struct platform_pwm_backlight_data flo_pwm_backlight_data = {
+        .pwm_id         = 2, // GPIO26 maps to LPGCHANNEL2
+        .max_brightness = 100,
+        .dft_brightness = 40,
+	/* 100khz*/
+        .pwm_period_ns  = 10000,
+};
+
+static struct platform_device flo_pwm_backlight_device = {
+        .name   = "pwm-backlight",
+        .dev    = {
+                .platform_data  = &flo_pwm_backlight_data,
+        }
+};
+
 static void __init apq8064_common_init(void)
 {
 	u32 platform_version;
@@ -3322,6 +3340,7 @@ static void __init apq8064_common_init(void)
 	smb345_init();
 	apq8064_audio_init();
 
+	platform_device_register(&flo_pwm_backlight_device);
 	apq8064_device_qup_spi_gsbi5.dev.platform_data =
 						&apq8064_qup_spi_gsbi5_pdata;
 	apq8064_init_pmic();
