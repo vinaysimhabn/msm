@@ -224,6 +224,8 @@ struct dsi_phy *dsi_phy_8960_init(struct dsi *dsi)
 	struct dsi_phy *phy = NULL;
 	int ret;
 
+	DBG(" %s ", __func__);
+
 	phy_8960 = kzalloc(sizeof(*phy_8960), GFP_KERNEL);
 	if (!phy_8960) {
 		ret = -ENOMEM;

@@ -3340,7 +3340,7 @@ static void __init apq8064_common_init(void)
 	smb345_init();
 	apq8064_audio_init();
 
-	platform_device_register(&flo_pwm_backlight_device);
+	/*platform_device_register(&flo_pwm_backlight_device);*/
 	apq8064_device_qup_spi_gsbi5.dev.platform_data =
 						&apq8064_qup_spi_gsbi5_pdata;
 	apq8064_init_pmic();

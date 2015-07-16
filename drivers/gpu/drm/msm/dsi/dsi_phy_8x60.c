@@ -180,6 +180,8 @@ struct dsi_phy *dsi_phy_8x60_init(struct dsi *dsi)
 	struct dsi_phy *phy = NULL;
 	int ret;
 
+	DBG(" %s ", __func__);
+
 	phy_8x60 = kzalloc(sizeof(*phy_8x60), GFP_KERNEL);
 	if (!phy_8x60) {
 		ret = -ENOMEM;
