@@ -39,9 +39,12 @@ struct panel_jdi {
 	struct regulator *reg_lvs5;
 	int pmic8921_23; /* panel VCC */
 	int gpio_LCM_XRES_SR2; /* JDI reset pin */
+	int gpio_LCM_TE; /* JDI te pin */
 };
 #define to_panel_jdi(x) container_of(x, struct panel_jdi, base)
 
+static char set_tear_off[2] = {0x35, 0x00};
+static char set_tear_on[2] = {0x34, 0x00};
 static char enter_sleep[2] = {0x10, 0x00};
 //-------------------- sleep out --------------------//
 static char write_memory105[1]={0x11};
@@ -157,20 +160,16 @@ static int panel_jdi_on(struct panel *panel)
 		return ret;
 
 	mipi_set_panel_config(mipi, &(struct mipi_panel_config){
-		.cmd_mode = false,
+		.cmd_mode = true,
+		.interleave_max = true,
+		.rgb_swap = SWAP_BGR,
 		.format = DST_FORMAT_RGB888,
-		.traffic_mode = NON_BURST_SYNCH_EVENT,
-		.bllp_power_stop = true,
-		.eof_bllp_power_stop = true,
-		.hsa_power_stop = false,
-		.hbp_power_stop = true,
-		.hfp_power_stop = true,
-		.pulse_mode_hsa_he = true,
-		.rgb_swap = SWAP_RGB,
-		.interleave_max = 0,
+		.insert_dcs_cmd = true,
+		.wr_mem_continue = 0x3c,
+		.wr_mem_start = 0x2c,
 		.dma_trigger = TRIGGER_SW,
 		.mdp_trigger = TRIGGER_NONE,
-		.te = false,
+		.te = true,
 		.dlane_swap = 0,
 		.t_clk_pre = 0x1c,
 		.t_clk_post = 0x04,
@@ -209,6 +208,8 @@ static int panel_jdi_on(struct panel *panel)
         mdelay(20);
         mipi_dcs_swrite(mipi, true, 0, false, write_memory106[0]);
         mdelay(5);
+	mipi_dcs_swrite(mipi, true, 0, false, set_tear_on[0]);
+	mdelay(5);
 
 //if(0)
 {
@@ -234,6 +235,8 @@ static int panel_jdi_off(struct panel *panel)
 	});
 
 	mipi_dcs_swrite(mipi, true, 0, false, enter_sleep[0]);
+	mdelay(5);
+	mipi_dcs_swrite(mipi, true, 0, false, set_tear_off[0]);
 	mdelay(5);
 
 	mipi_off(mipi);
@@ -337,6 +340,23 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 	ret = gpio_direction_output(panel_jdi->gpio_LCM_XRES_SR2, 0);
 	if (ret) {
 		dev_err(dev->dev, "failed to request gpio direction output mpp: %d\n", ret);
+		goto fail;
+	}
+
+	panel_jdi->gpio_LCM_TE = 0;
+	ret = gpio_request(panel_jdi->gpio_LCM_TE, "MDP_VSYNC");
+	if (ret) {
+		dev_err(dev->dev, "failed to request LCM_TE : %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_export(panel_jdi->gpio_LCM_TE, true);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio export lcm_te: %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_direction_input(panel_jdi->gpio_LCM_TE);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio direction input lcm_te: %d\n", ret);
 		goto fail;
 	}
 

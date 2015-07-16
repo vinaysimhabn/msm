@@ -175,6 +175,7 @@ int mdp4_disable(struct mdp4_kms *mdp4_kms)
 {
 	DBG("");
 
+	clk_disable_unprepare(mdp4_kms->vsync_clk);
 	clk_disable_unprepare(mdp4_kms->clk);
 	if (mdp4_kms->pclk)
 		clk_disable_unprepare(mdp4_kms->pclk);
@@ -191,6 +192,7 @@ int mdp4_enable(struct mdp4_kms *mdp4_kms)
 	if (mdp4_kms->pclk)
 		clk_prepare_enable(mdp4_kms->pclk);
 	clk_prepare_enable(mdp4_kms->lut_clk);
+	clk_prepare_enable(mdp4_kms->vsync_clk);
 
 	return 0;
 }
@@ -451,6 +453,13 @@ struct msm_kms *mdp4_kms_init(struct drm_device *dev)
 	if (IS_ERR(mdp4_kms->lut_clk)) {
 		dev_err(dev->dev, "failed to get lut_clk\n");
 		ret = PTR_ERR(mdp4_kms->lut_clk);
+		goto fail;
+	}
+
+	mdp4_kms->vsync_clk = devm_clk_get(&pdev->dev, "vsync_clk");
+	if (IS_ERR(mdp4_kms->vsync_clk)) {
+		dev_err(dev->dev, "failed to get vsync_clk\n");
+		ret = PTR_ERR(mdp4_kms->vsync_clk);
 		goto fail;
 	}
 

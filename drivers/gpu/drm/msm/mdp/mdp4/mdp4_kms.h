@@ -51,6 +51,7 @@ struct mdp4_kms {
 	struct clk *clk;
 	struct clk *pclk;
 	struct clk *lut_clk;
+	struct clk *vsync_clk; /* MIPI_CMD_PANEL */
 
 	struct mdp_irq error_handler;
 

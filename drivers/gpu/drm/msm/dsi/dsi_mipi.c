@@ -103,7 +103,14 @@ static int dsi_mipi_set_panel_config(struct mipi_adapter *mipi,
 	phy->funcs->config(phy, pcfg);
 
 	if (pcfg->cmd_mode) {
-		/* TODO */
+		dsi_write(dsi, REG_DSI_CMD_CFG0,
+				DSI_VID_CFG1_INTERLEAVE_MAX(pcfg->interleave_max) |
+				DSI_VID_CFG1_RGB_SWAP(pcfg->rgb_swap) |
+				DSI_CMD_CFG0_DST_FORMAT(pcfg->format));
+		dsi_write(dsi, REG_DSI_CMD_OFFSET,
+				DSI_CMD_CTRL_MEM_CONTINUE(pcfg->wr_mem_continue) |
+				DSI_CMD_CTRL_MEM_START(pcfg->wr_mem_start) |
+				COND(pcfg->insert_dcs_cmd, DSI_CMD_INSERT_DCS_CMD));
 	} else {
 		dsi_write(dsi, REG_DSI_VID_CFG0,
 				DSI_VID_CFG0_VIRT_CHANNEL(0) | /* seems always zero */
@@ -164,7 +171,8 @@ static int dsi_mipi_on(struct mipi_adapter *mipi)
 	ctrl = dsi_read(dsi, REG_DSI_CTRL);
 //	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE );
 
-	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_VID_MODE_EN);
+	//dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_VID_MODE_EN);
+	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_CMD_MODE_EN);
 	dsi_write(dsi, REG_DSI_INTR_CTRL,
 			DSI_IRQ_CMD_DMA_DONE | DSI_IRQ_MASK_CMD_DMA_DONE |
 			DSI_IRQ_ERROR | DSI_IRQ_MASK_ERROR);

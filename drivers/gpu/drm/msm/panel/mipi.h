@@ -57,6 +57,10 @@ struct mipi_panel_config {
 	bool tx_eot_append;
 	bool ecc_check;
 	bool crc_check;
+	bool insert_dcs_cmd;
+        uint32_t wr_mem_continue;
+        uint32_t wr_mem_start;
+
 
 	// XXX this stuff is very msm specific (ie. it is directly register
 	// values), so doesn't belong here.. but I need to know the meaning

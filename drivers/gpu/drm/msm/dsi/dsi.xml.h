@@ -114,6 +114,21 @@ static inline uint32_t DSI_VID_CFG0_DST_FORMAT(enum dsi_dst_format val)
 {
 	return ((val) << DSI_VID_CFG0_DST_FORMAT__SHIFT) & DSI_VID_CFG0_DST_FORMAT__MASK;
 }
+#define DSI_CMD_CFG0_DST_FORMAT__MASK				0x000000f0
+static inline uint32_t DSI_CMD_CFG0_DST_FORMAT(enum dsi_dst_format val)
+{
+	return (val  & DSI_CMD_CFG0_DST_FORMAT__MASK);
+}
+#define DSI_CMD_CTRL__MASK					0x000000ff
+static inline uint32_t DSI_CMD_CTRL_MEM_CONTINUE(enum dsi_dst_format val)
+{
+	return (val  & DSI_CMD_CTRL__MASK);
+}
+#define DSI_CMD_CTRL_MEM_START__SHIFT				8
+static inline uint32_t DSI_CMD_CTRL_MEM_START(enum dsi_dst_format val)
+{
+	return ((val) << DSI_CMD_CTRL_MEM_START__SHIFT) & DSI_CMD_CTRL__MASK;
+}
 #define DSI_VID_CFG0_TRAFFIC_MODE__MASK				0x00000300
 #define DSI_VID_CFG0_TRAFFIC_MODE__SHIFT			8
 static inline uint32_t DSI_VID_CFG0_TRAFFIC_MODE(enum dsi_traffic_mode val)
@@ -221,6 +236,10 @@ static inline uint32_t DSI_ACTIVE_VSYNC_END(uint32_t val)
 #define REG_DSI_CMD_CFG0					0x0000003c
 
 #define REG_DSI_CMD_CFG1					0x00000040
+
+#define REG_DSI_CMD_OFFSET					0x00000044
+
+#define DSI_CMD_INSERT_DCS_CMD					0x00010000
 
 #define REG_DSI_DMA_BASE					0x00000044
 

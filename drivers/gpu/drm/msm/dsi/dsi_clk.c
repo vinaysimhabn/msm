@@ -42,7 +42,8 @@ void dsi_clk_prepare(struct dsi *dsi)
 	if (clk_set_rate(dsi->byte_div_clk, 1) < 0)      /* divided by 1 */
                 pr_err("%s: dsi_byte_div_clk - "
                         "clk_set_rate failed\n", __func__);
-        if (clk_set_rate(dsi->esc_clk, 2) < 0) /* divided by 2 */
+        if (clk_set_rate(dsi->esc_clk, 9) < 0) /* divided by 9 */
+	/*pinfo.mipi.esc_byte_ratio = 9;  control TLPX: 75ns */
                 pr_err("%s: dsi_esc_clk - "
                         "clk_set_rate failed\n", __func__);
 
