@@ -79,7 +79,7 @@ VREG_CONSUMERS(L10) = {
 };
 VREG_CONSUMERS(L11) = {
 	REGULATOR_SUPPLY("8921_l11",		NULL),
-	REGULATOR_SUPPLY("dsi_avdd",		"mdp.0"),
+	REGULATOR_SUPPLY("dsi1_avdd",		"mdp.0"),
 	/*REGULATOR_SUPPLY("dsi1_avdd",		"mipi_dsi.1"),*/
 };
 VREG_CONSUMERS(L12) = {
@@ -230,7 +230,7 @@ VREG_CONSUMERS(LVS7) = {
 	REGULATOR_SUPPLY("8921_lvs7",		NULL),
 	REGULATOR_SUPPLY("pll_vdd",		"pil_riva"),
 	REGULATOR_SUPPLY("lvds_vdda",		"lvds.0"),
-	REGULATOR_SUPPLY("dsi_vddio",		"mdp.0"),
+	REGULATOR_SUPPLY("dsi1_vddio",		"mdp.0"),
 	/*REGULATOR_SUPPLY("dsi1_vddio",		"mipi_dsi.1"),*/
 	REGULATOR_SUPPLY("hdmi_vdda",		"hdmi_msm.0"),
 };
