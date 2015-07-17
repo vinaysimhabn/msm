@@ -263,8 +263,8 @@ static int dsi_dev_probe(struct platform_device *pdev)
 	
 	config.phy_init = dsi_phy_8960_init;//FIX: hardcoded, need to revert back
 
-	if (cpu_is_apq8064() || cpu_is_msm8960())
-		DBG(" %s : apq8064 phy ", __func__);
+	if (cpu_is_apq8064aa() || cpu_is_msm8960())
+		DBG(" %s : apq8064 aa phy ", __func__);
 	else if (cpu_is_msm8x60())
 		config.phy_init = dsi_phy_8x60_init;
 	else
