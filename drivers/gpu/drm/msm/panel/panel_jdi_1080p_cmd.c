@@ -45,13 +45,26 @@ struct panel_jdi {
 
 static char set_tear_off[2] = {0x35, 0x00};
 static char set_tear_on[2] = {0x34, 0x00};
-static char enter_sleep[2] = {0x10, 0x00};
-//-------------------- sleep out --------------------//
-static char write_memory105[1]={0x11};
-//delay1m{200};
-static char pixels_on[1]={0x23};/* For testing , all pixel on*/
 
-static char write_memory106[1]={0x29};
+static char sw_reset[2] = {0x01, 0x00}; /* DTYPE_DCS_WRITE */
+static char enter_sleep[2] = {0x10, 0x00}; /* DTYPE_DCS_WRITE */
+static char exit_sleep[2] = {0x11, 0x00}; /* DTYPE_DCS_WRITE */
+static char display_off[2] = {0x28, 0x00}; /* DTYPE_DCS_WRITE */
+static char display_on[2] = {0x29, 0x00}; /* DTYPE_DCS_WRITE */
+
+static char MCAP[2] = {0xB0, 0x00};
+static char interface_setting[6] = {0xB3, 0x04, 0x08, 0x00, 0x22, 0x00};
+static char interface_ID_setting[2] = {0xB4, 0x0C};
+static char DSI_control[3] = {0xB6, 0x3A, 0xD3};
+static char set_pixel_format[2] = {0x3A, 0x77};
+static char set_column_addr[5] = {0x2A, 0x00, 0x00, 0x04, 0xAF};
+static char set_page_addr[5] = {0x2B, 0x00, 0x00, 0x07, 0x7F};
+
+/* for fps control, set fps to 60.32Hz */
+static char LTPS_timing_setting[2] = {0xC6, 0x78};
+static char sequencer_timing_control[2] = {0xD6, 0x01};
+
+static char bl_value[2] = {0x51, 0x0};
 
 static void panel_jdi_destroy(struct panel *panel)
 {
@@ -204,20 +217,27 @@ static int panel_jdi_on(struct panel *panel)
 	});
 
 	mipi_on(mipi);
-	mipi_dcs_swrite(mipi, true, 0, false,write_memory105[0]); 
+	mipi_dcs_swrite(mipi, true, 0, false, sw_reset[0]);
+	mipi_gen_write(mipi, true, 0, MCAP);
+	mipi_lwrite(mipi, true, 0, interface_setting);
+	mipi_lwrite(mipi, true, 0, interface_ID_setting);
+	mipi_lwrite(mipi, true, 0, DSI_control);
+	mipi_gen_write(mipi, true, 0, LTPS_timing_setting);
+	mipi_gen_write(mipi, true, 0, sequencer_timing_control);
+	mipi_dcs_swrite(mipi, true, 0, false, set_pixel_format[0]);
+	mipi_dcs_swrite(mipi, true, 0, false, set_column_addr[0]);
+	mipi_dcs_swrite(mipi, true, 0, false, set_page_addr[0]);
         mdelay(20);
-        mipi_dcs_swrite(mipi, true, 0, false, write_memory106[0]);
+        mipi_dcs_swrite(mipi, true, 0, false, exit_sleep[0]);
+        mdelay(5);
+        mipi_dcs_swrite(mipi, true, 0, false, display_on[0]);
         mdelay(5);
 	mipi_dcs_swrite(mipi, true, 0, false, set_tear_on[0]);
-	mdelay(5);
-
-//if(0)
-{
-        /*ALL pixels on*/
-        mipi_dcs_swrite(mipi, true, 0, false, pixels_on[0]);
         mdelay(5);
-}
-
+	mipi_gen_write(mipi, true, 0, bl_value);
+        mdelay(5);
+	bl_value[1] = 0x60;
+	mipi_gen_write(mipi, true, 0, bl_value);
 	
 	return 0;
 }
@@ -234,6 +254,8 @@ static int panel_jdi_off(struct panel *panel)
 		.lanes = 0xf,
 	});
 
+	mipi_dcs_swrite(mipi, true, 0, false, display_off[0]);
+	mdelay(5);
 	mipi_dcs_swrite(mipi, true, 0, false, enter_sleep[0]);
 	mdelay(5);
 	mipi_dcs_swrite(mipi, true, 0, false, set_tear_off[0]);
