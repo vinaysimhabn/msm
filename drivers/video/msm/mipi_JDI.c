@@ -10,7 +10,7 @@
  * GNU General Public License for more details.
  *
  */
-
+#define DEBUG
 #include "msm_fb.h"
 #include "mipi_dsi.h"
 #include "mipi_JDI.h"
