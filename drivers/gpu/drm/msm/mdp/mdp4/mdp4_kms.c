@@ -233,7 +233,9 @@ static int modeset_init(struct mdp4_kms *mdp4_kms)
 	struct drm_connector *connector;
 	struct drm_panel *panel;
 #endif
+#ifdef CONFIG_DRM_MSM_HDMI
 	struct hdmi *hdmi;
+#endif
 	int ret;
 
 	/* construct non-private planes: */
@@ -343,6 +345,7 @@ static int modeset_init(struct mdp4_kms *mdp4_kms)
 	 * Setup DTV/HDMI path: RGB1 -> DMA_E -> DTV -> HDMI:
 	 */
 
+#ifdef CONFIG_DRM_MSM_HDMI
 	plane = mdp4_plane_init(dev, RGB1, true);
 	if (IS_ERR(plane)) {
 		dev_err(dev->dev, "failed to construct plane for RGB1\n");
@@ -376,6 +379,7 @@ static int modeset_init(struct mdp4_kms *mdp4_kms)
 		dev_err(dev->dev, "failed to initialize HDMI: %d\n", ret);
 		goto fail;
 	}
+#endif
 
 	return 0;
 
