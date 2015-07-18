@@ -64,6 +64,24 @@ static char set_page_addr[5] = {0x2B, 0x00, 0x00, 0x07, 0x7F};
 static char LTPS_timing_setting[2] = {0xC6, 0x78};
 static char sequencer_timing_control[2] = {0xD6, 0x01};
 
+/* set brightness */
+static char write_display_brightness[] = {0x51, 0x00};
+/* enable LEDPWM pin output, turn on LEDPWM output, turn off pwm dimming */
+static char write_control_display[] = {0x53, 0x24};
+/* choose cabc mode, 0x00(-0%), 0x01(-15%), 0x02(-40%), 0x03(-54%),
+    disable SRE(sunlight readability enhancement) */
+static char write_cabc[] = {0x55, 0x00};
+/* for cabc mode 0x1(-15%) */
+static char backlight_control1[] = {0xB8, 0x07, 0x87, 0x26, 0x18, 0x00, 0x32};
+/* for cabc mode 0x2(-40%) */
+static char backlight_control2[] = {0xB9, 0x07, 0x75, 0x61, 0x20, 0x16, 0x87};
+/* for cabc mode 0x3(-54%) */
+static char backlight_control3[] = {0xBA, 0x07, 0x70, 0x81, 0x20, 0x45, 0xB4};
+/* for pwm frequency and dimming control */
+static char backlight_control4[] = {0xCE, 0x7D, 0x40, 0x48, 0x56, 0x67, 0x78,
+                0x88, 0x98, 0xA7, 0xB5, 0xC3, 0xD1, 0xDE, 0xE9, 0xF2, 0xFA,
+                0xFF, 0x37, 0xF5, 0x0F, 0x0F, 0x42, 0x00};
+
 static char bl_value[2] = {0x51, 0x0};
 
 static void panel_jdi_destroy(struct panel *panel)
@@ -224,6 +242,13 @@ static int panel_jdi_on(struct panel *panel)
 	mipi_lwrite(mipi, true, 0, DSI_control);
 	mipi_gen_write(mipi, true, 0, LTPS_timing_setting);
 	mipi_gen_write(mipi, true, 0, sequencer_timing_control);
+	mipi_gen_write(mipi, true, 0, write_display_brightness);
+	mipi_gen_write(mipi, true, 0, write_control_display);
+	mipi_gen_write(mipi, true, 0, write_cabc);
+	mipi_lwrite(mipi, true, 0, backlight_control1);
+	mipi_lwrite(mipi, true, 0, backlight_control2);
+	mipi_lwrite(mipi, true, 0, backlight_control3);
+	mipi_lwrite(mipi, true, 0, backlight_control4);
 	mipi_dcs_swrite(mipi, true, 0, false, set_pixel_format[0]);
 	mipi_dcs_swrite(mipi, true, 0, false, set_column_addr[0]);
 	mipi_dcs_swrite(mipi, true, 0, false, set_page_addr[0]);
@@ -236,7 +261,7 @@ static int panel_jdi_on(struct panel *panel)
         mdelay(5);
 	mipi_gen_write(mipi, true, 0, bl_value);
         mdelay(5);
-	bl_value[1] = 0x60;
+	bl_value[1] = 0x60;//TODO: need to map with pwm - pm8921_gpio_26
 	mipi_gen_write(mipi, true, 0, bl_value);
 	
 	return 0;
