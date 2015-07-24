@@ -973,7 +973,8 @@ static int msm_pdev_probe(struct platform_device *pdev)
 	 * care about apq8064/apq8060/etc (all mdp4/a3xx):
 	 */
 	static const char *devnames[] = {
-			"hdmi_msm.0", "kgsl-3d0.0",
+		/*"hdmi_msm.0", "kgsl-3d0.0",*/
+		"mipi_dsi.0", "kgsl-3d0.0",
 	};
 	int i;
 
