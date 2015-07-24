@@ -259,16 +259,10 @@ static int dsi_dev_probe(struct platform_device *pdev)
 #ifdef CONFIG_OF
 	/* TODO */
 #else
-	DBG(" %s : phy ", __func__);
-	
-	config.phy_init = dsi_phy_8960_init;//FIX: hardcoded, need to revert back
-
 	if (cpu_is_apq8064aa() || cpu_is_msm8960())
-		DBG(" %s : apq8064 aa phy ", __func__);
+		config.phy_init = dsi_phy_8960_init;/*8064aa for flo-nexus7*/
 	else if (cpu_is_msm8x60())
 		config.phy_init = dsi_phy_8x60_init;
-	else
-		DBG("%s : TODO cpu-phy type failed", __func__);
 #endif
 	if (!pdev->dev.coherent_dma_mask)
 		pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
