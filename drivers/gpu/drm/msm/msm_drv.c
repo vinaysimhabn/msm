@@ -973,8 +973,8 @@ static int msm_pdev_probe(struct platform_device *pdev)
 	 * care about apq8064/apq8060/etc (all mdp4/a3xx):
 	 */
 	static const char *devnames[] = {
-		/*"hdmi_msm.0", "kgsl-3d0.0",*/
-		"mipi_dsi.0", "kgsl-3d0.0",
+		"hdmi_msm.0", "kgsl-3d0.0",
+		/*"mipi_dsi.0", "kgsl-3d0.0", TODO : FIX*/
 	};
 	int i;
 
@@ -1033,9 +1033,9 @@ static int __init msm_drm_register(void)
 {
 	DBG("init");
 	dsi_register();
-#ifdef CONFIG_DRM_MSM_HDMI
+//#ifdef CONFIG_DRM_MSM_HDMI
 	hdmi_register();
-#endif
+//#endif
 	a3xx_register();
 	return platform_driver_register(&msm_platform_driver);
 }
@@ -1045,9 +1045,9 @@ static void __exit msm_drm_unregister(void)
 	DBG("fini");
 	platform_driver_unregister(&msm_platform_driver);
 	dsi_unregister();
-#ifdef CONFIG_DRM_MSM_HDMI
+//#ifdef CONFIG_DRM_MSM_HDMI
 	hdmi_unregister();
-#endif
+//#endif
 	a3xx_unregister();
 }
 
