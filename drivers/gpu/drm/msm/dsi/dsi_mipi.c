@@ -171,8 +171,8 @@ static int dsi_mipi_on(struct mipi_adapter *mipi)
 	ctrl = dsi_read(dsi, REG_DSI_CTRL);
 //	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE );
 
-	//dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_VID_MODE_EN);
-	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_CMD_MODE_EN);
+	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_VID_MODE_EN);
+//	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_CMD_MODE_EN);
 	dsi_write(dsi, REG_DSI_INTR_CTRL,
 			DSI_IRQ_CMD_DMA_DONE | DSI_IRQ_MASK_CMD_DMA_DONE |
 			DSI_IRQ_ERROR | DSI_IRQ_MASK_ERROR);

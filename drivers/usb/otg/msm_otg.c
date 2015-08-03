@@ -142,34 +142,34 @@ static void asus_chg_set_chg_mode(enum usb_chg_type chg_src)
 
 	switch (chg_type) {
 	case USB_INVALID_CHARGER:
-		usb_cable_type_detect(CHARGER_NONE);
+		//usb_cable_type_detect(CHARGER_NONE);
 		printk(KERN_INFO "The USB cable status = CHARGER_NONE\n");
 		break;
 	case USB_SDP_CHARGER:
-		usb_cable_type_detect(CHARGER_SDP);
+		//usb_cable_type_detect(CHARGER_SDP);
 		printk(KERN_INFO "The USB cable status = CHARGER_SDP\n");
 		break;
 	case USB_DCP_CHARGER:
-		usb_cable_type_detect(CHARGER_DCP);
+		//usb_cable_type_detect(CHARGER_DCP);
 		printk(KERN_INFO "The USB cable status = CHARGER_DCP\n");
 		break;
 	case USB_CDP_CHARGER:
-		usb_cable_type_detect(CHARGER_CDP);
+		//usb_cable_type_detect(CHARGER_CDP);
 		printk(KERN_INFO "The USB cable status = CHARGER_CDP\n");
 		break;
 	case USB_ACA_A_CHARGER:
 	case USB_ACA_B_CHARGER:
 	case USB_ACA_C_CHARGER:
 	case USB_ACA_DOCK_CHARGER:
-		usb_cable_type_detect(CHARGER_ACA);
+		//usb_cable_type_detect(CHARGER_ACA);
 		printk(KERN_INFO "The USB cable status = CHARGER_ACA\n");
 		break;
 	case USB_PROPRIETARY_CHARGER:
-		usb_cable_type_detect(CHARGER_OTHER);
+		//usb_cable_type_detect(CHARGER_OTHER);
 		printk(KERN_INFO "The USB cable status = CHARGER_OTHER\n");
 		break;
 	default:
-		usb_cable_type_detect(CHARGER_TBD);
+		//usb_cable_type_detect(CHARGER_TBD);
 		printk(KERN_INFO "The USB cable status = CHARGER_TBD\n");
 	}
 
@@ -1267,7 +1267,7 @@ static void msm_otg_start_host(struct usb_otg *otg, int on)
 
 	if (on) {
 		dev_dbg(otg->phy->dev, "host on\n");
-		smb345_otg_status(true);
+		//smb345_otg_status(true);
 		otg_host_on = 1;
 
 		// Reset to apply new parameter for host.
@@ -1299,7 +1299,7 @@ static void msm_otg_start_host(struct usb_otg *otg, int on)
 			ulpi_write(otg->phy, OTG_COMP_DISABLE,
 				ULPI_CLR(ULPI_PWR_CLK_MNG_REG));
 
-		smb345_otg_status(false);
+		//smb345_otg_status(false);
 		otg_host_on = 0;
 	}
 }

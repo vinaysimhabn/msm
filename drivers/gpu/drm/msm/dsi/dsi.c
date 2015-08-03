@@ -259,7 +259,8 @@ static int dsi_dev_probe(struct platform_device *pdev)
 #ifdef CONFIG_OF
 	/* TODO */
 #else
-	if (cpu_is_apq8064aa() || cpu_is_msm8960())
+	if (cpu_is_apq8064aa() || cpu_is_msm8960()
+		|| cpu_is_apq8064())
 		config.phy_init = dsi_phy_8960_init;/*8064aa for flo-nexus7*/
 	else if (cpu_is_msm8x60())
 		config.phy_init = dsi_phy_8x60_init;

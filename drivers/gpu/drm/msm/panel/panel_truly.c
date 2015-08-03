@@ -626,7 +626,7 @@ struct panel *panel_truly_init(struct drm_device *dev,
 		goto fail;
 	}
 
-	ret = regulator_set_voltage(panel_truly->reg_l8_avdd,  3300000, 3300000);
+	ret = regulator_set_voltage(panel_truly->reg_l8_avdd,  2800000, 2800000);
 	if (ret) {
 		dev_err(dev->dev, "set_voltage l8 failed: %d\n", ret);
 		goto fail;

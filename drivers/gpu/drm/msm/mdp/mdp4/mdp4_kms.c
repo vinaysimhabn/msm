@@ -20,6 +20,7 @@
 #include "msm_mmu.h"
 #include "mdp4_kms.h"
 
+#define CONFIG_DRM_MSM_HDMI
 static struct mdp4_platform_config *mdp4_get_config(struct platform_device *dev);
 
 static int mdp4_hw_init(struct msm_kms *kms)
@@ -344,7 +345,6 @@ static int modeset_init(struct mdp4_kms *mdp4_kms)
 	/*
 	 * Setup DTV/HDMI path: RGB1 -> DMA_E -> DTV -> HDMI:
 	 */
-
 #ifdef CONFIG_DRM_MSM_HDMI
 	plane = mdp4_plane_init(dev, RGB1, true);
 	if (IS_ERR(plane)) {

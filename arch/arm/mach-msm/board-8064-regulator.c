@@ -32,7 +32,7 @@ VREG_CONSUMERS(L2) = {
 	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csid.1"),
 	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csid.2"),
 	REGULATOR_SUPPLY("lvds_pll_vdda",	"lvds.0"),
-	REGULATOR_SUPPLY("dsi1_pll_vdda",	"mipi_dsi.1"),
+	REGULATOR_SUPPLY("dsi_pll_vdda",	"mdp.0"),
 };
 VREG_CONSUMERS(L3) = {
 	REGULATOR_SUPPLY("8921_l3",		NULL),
@@ -64,6 +64,9 @@ VREG_CONSUMERS(L8) = {
 	REGULATOR_SUPPLY("cam_vana",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vana",		"4-0034"),
 	REGULATOR_SUPPLY("cam_vana",		"4-0020"),
+	REGULATOR_SUPPLY("dsi1_avdd",           "mdp.0"), /* MIPI DSI */
+        REGULATOR_SUPPLY("dsi1_vddio",          "mdp.0"), /* MIPI DSI */
+
 };
 VREG_CONSUMERS(L9) = {
 	REGULATOR_SUPPLY("8921_l9",		NULL),
@@ -101,6 +104,7 @@ VREG_CONSUMERS(L16) = {
 	REGULATOR_SUPPLY("cam_vaf",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-0034"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-0020"),
+	REGULATOR_SUPPLY("dsi1_l16",    "mdp.0"), /* MIPI DSI - this required for 6440 board*/
 };
 VREG_CONSUMERS(L17) = {
 	REGULATOR_SUPPLY("8921_l17",		NULL),
@@ -177,6 +181,7 @@ VREG_CONSUMERS(S4) = {
 	REGULATOR_SUPPLY("vcc_i2c",		"3-0024"),
 	REGULATOR_SUPPLY("vddp",		"0-0048"),
 	REGULATOR_SUPPLY("hdmi_lvl_tsl",	"hdmi_msm.0"),
+	REGULATOR_SUPPLY("dsi1_s4_iovdd",       "mdp.0"), /* MIPI DSI */
 };
 VREG_CONSUMERS(S5) = {
 	REGULATOR_SUPPLY("8921_s5",		NULL),
@@ -219,6 +224,7 @@ VREG_CONSUMERS(LVS7) = {
 	REGULATOR_SUPPLY("pll_vdd",		"pil_riva"),
 	REGULATOR_SUPPLY("lvds_vdda",		"lvds.0"),
 	REGULATOR_SUPPLY("dsi1_vddio",		"mipi_dsi.1"),
+	REGULATOR_SUPPLY("dsi_pll_vddio",       "mdp.0"),
 	REGULATOR_SUPPLY("hdmi_vdda",		"hdmi_msm.0"),
 };
 VREG_CONSUMERS(USB_OTG) = {

@@ -30,8 +30,8 @@ struct panel *mipi_panel_init(struct drm_device *dev,
 		struct platform_device *pdev, struct mipi_adapter *mipi)
 {
 	/* TODO actually choose right panel.. */
-	//return panel_truly_init(dev, pdev, mipi);
-	return panel_jdi_1080p_init(dev, pdev, mipi);
+	return panel_truly_init(dev, pdev, mipi);
+	//return panel_jdi_1080p_init(dev, pdev, mipi);
 	//return panel_lgit_init(dev, pdev, mipi);
 //	return panel_jdi_init(dev, pdev, mipi);
 }
