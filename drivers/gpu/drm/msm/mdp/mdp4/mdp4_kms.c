@@ -20,7 +20,7 @@
 #include "msm_mmu.h"
 #include "mdp4_kms.h"
 
-#define CONFIG_DRM_MSM_HDMI
+//#define CONFIG_DRM_MSM_HDMI
 static struct mdp4_platform_config *mdp4_get_config(struct platform_device *dev);
 
 static int mdp4_hw_init(struct msm_kms *kms)

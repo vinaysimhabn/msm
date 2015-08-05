@@ -108,7 +108,7 @@ struct hdmi *hdmi_init(struct drm_device *dev, struct drm_encoder *encoder)
 
 	if (IS_ERR(hdmi->phy)) {
 		ret = PTR_ERR(hdmi->phy);
-		dev_err(dev->dev, "failed to load phy: %d\n", ret);
+		dev_err(dev->dev, "failed to load hdmi phy: %d\n", ret);
 		hdmi->phy = NULL;
 		goto fail;
 	}
@@ -267,6 +267,7 @@ static void set_hdmi_pdev(struct drm_device *dev,
 static int hdmi_bind(struct device *dev, struct device *master, void *data)
 {
 	static struct hdmi_platform_config config = {};
+
 #ifdef CONFIG_OF
 	struct device_node *of_node = dev->of_node;
 
@@ -329,7 +330,7 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
 	static const char *hpd_clk_names[] = {
 			"core_clk", "master_iface_clk", "slave_iface_clk",
 	};
-	if (cpu_is_apq8064()) {
+	if (cpu_is_apq8064() || cpu_is_apq8064aa()) {
 		static const char *hpd_reg_names[] = {"8921_hdmi_mvs"};
 		config.phy_init      = hdmi_phy_8960_init;
 		config.mmio_name     = "hdmi_msm_hdmi_addr";
