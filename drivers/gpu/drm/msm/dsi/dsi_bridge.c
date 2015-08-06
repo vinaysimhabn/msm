@@ -83,6 +83,7 @@ static void dsi_bridge_mode_set(struct drm_bridge *bridge,
 	struct dsi_bridge *dsi_bridge = to_dsi_bridge(bridge);
 	struct dsi *dsi = dsi_bridge->dsi;
 	int hstart, hend, vstart, vend;
+	int bpp;
 
 	mode = adjusted_mode;
 
@@ -96,7 +97,7 @@ static void dsi_bridge_mode_set(struct drm_bridge *bridge,
 
 	DBG("htotal=%d, vtotal=%d, hstart=%d, hend=%d, vstart=%d, vend=%d",
 			mode->htotal, mode->vtotal, hstart, hend, vstart, vend);
-
+if(0){/* for video mode panel */
 	dsi_write(dsi, REG_DSI_ACTIVE_H,
 			DSI_ACTIVE_H_START(hstart) |
 			DSI_ACTIVE_H_END(hend));
@@ -115,6 +116,21 @@ static void dsi_bridge_mode_set(struct drm_bridge *bridge,
 	dsi_write(dsi, REG_DSI_ACTIVE_VSYNC,
 			DSI_ACTIVE_VSYNC_START(0) |
 			DSI_ACTIVE_VSYNC_END(mode->vsync_end - mode->vsync_start));
+}
+	/* command mode panel */
+	bpp = 3; /*DSI_CMD_DST_FORMAT_RGB888, TODO for RGB565*/
+	dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM1_CTRL,
+			DSI_COMMAND_MODE_MDP_STREAM1_CTRL(
+			mode->hdisplay * bpp  + 1) | DTYPE_DCS_LWRITE);
+	dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM0_CTRL,
+			DSI_COMMAND_MODE_MDP_STREAM1_CTRL(
+			mode->hdisplay * bpp + 1) | DTYPE_DCS_LWRITE);
+	dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM0_TOTAL,
+			DSI_COMMAND_MODE_MDP_STREAM1_TOTAL(mode->vdisplay) |
+			mode->hdisplay);
+	dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM1_TOTAL,
+			DSI_COMMAND_MODE_MDP_STREAM1_TOTAL(mode->vdisplay) |
+			mode->hdisplay);
 }
 
 static const struct drm_bridge_funcs dsi_bridge_funcs = {

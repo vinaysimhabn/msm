@@ -543,7 +543,7 @@ static struct mdp4_platform_config *mdp4_get_config(struct platform_device *dev)
 	config.max_clk = 266667000;
 	config.iommu = iommu_domain_alloc(&platform_bus_type);
 #else
-	if (cpu_is_apq8064())
+	if (cpu_is_apq8064() || cpu_is_apq8064aa())
 		config.max_clk = 266667000;
 	else
 		config.max_clk = 200000000;
