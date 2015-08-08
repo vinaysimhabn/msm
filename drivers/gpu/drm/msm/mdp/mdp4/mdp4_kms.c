@@ -421,8 +421,18 @@ struct msm_kms *mdp4_kms_init(struct drm_device *dev)
 
 	mdp4_kms->dsi_pll_vdda =
 			devm_regulator_get_optional(&pdev->dev, "dsi_pll_vdda");
-	if (IS_ERR(mdp4_kms->dsi_pll_vdda))
+	if (IS_ERR(mdp4_kms->dsi_pll_vdda)){
+		dev_err(dev->dev, "failed to get regulator dsi_pll_vdda: \n");
 		mdp4_kms->dsi_pll_vdda = NULL;
+	}
+
+	if (mdp4_kms->dsi_pll_vdda) {
+		ret = regulator_enable(mdp4_kms->dsi_pll_vdda);
+		if (ret) {
+			dev_err(dev->dev, "failed to enable regulator dsi_pll_vdda: %d\n", ret);
+			goto fail;
+		}
+	}
 
 	mdp4_kms->dsi_pll_vddio =
 			devm_regulator_get_optional(&pdev->dev, "dsi_pll_vddio");
@@ -543,7 +553,7 @@ static struct mdp4_platform_config *mdp4_get_config(struct platform_device *dev)
 	config.max_clk = 266667000;
 	config.iommu = iommu_domain_alloc(&platform_bus_type);
 #else
-	if (cpu_is_apq8064() || cpu_is_apq8064aa())
+	if (cpu_is_apq8064())
 		config.max_clk = 266667000;
 	else
 		config.max_clk = 200000000;

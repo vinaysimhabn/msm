@@ -182,7 +182,8 @@ static void dsi_phy_8960_clk_enable(struct dsi_phy *phy)
 	if (clk_set_rate(dsi->byte_div_clk, 1) < 0)	/* divided by 1 */
 		dev_err(dsi->dev->dev, "failed to set byte_div_clk\n");
 
-	if (clk_set_rate(dsi->esc_clk, 2) < 0) /* divided by 2 */
+	if (clk_set_rate(dsi->esc_clk, 9) < 0) /* divided by 9 */
+	//if (clk_set_rate(dsi->esc_clk, 2) < 0) /* divided by 2 */
 		dev_err(dsi->dev->dev, "failed to set esc_clk\n");
 
 	dsi_clk_enable_pclk(dsi);

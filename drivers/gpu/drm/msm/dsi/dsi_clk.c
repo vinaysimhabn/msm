@@ -39,15 +39,18 @@ const struct dsi_clk_mnd *dsi_find_clk_mnd(unsigned bpp, unsigned nlanes)
 
 void dsi_clk_prepare(struct dsi *dsi)
 {
-	if (clk_set_rate(dsi->byte_div_clk, 1) < 0)      /* divided by 1 */
-                pr_err("%s: dsi_byte_div_clk - "
+	/*if (clk_set_rate(dsi->byte_div_clk, 1) < 0) */   /* divided by 1 */
+        /*      pr_err("%s: dsi_byte_div_clk - "
                         "clk_set_rate failed\n", __func__);
+	*/
 	/* divided by 2 for truly 480x864 video mode panel */
 	/* divided by 9 for jdi 1920x1200 command mode panel */
 	/*pinfo.mipi.esc_byte_ratio = 9;  control TLPX: 75ns */
+	/*
         if (clk_set_rate(dsi->esc_clk, 9) < 0)
                 pr_err("%s: dsi_esc_clk - "
                         "clk_set_rate failed\n", __func__);
+	*/
 
 	clk_prepare(dsi->amp_pclk);
 	clk_prepare(dsi->m_pclk);

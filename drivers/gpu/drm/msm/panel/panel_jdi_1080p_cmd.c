@@ -126,15 +126,12 @@ static int panel_jdi_power_on(struct panel *panel)
 		dev_err(dev->dev, "failed to enable lvs5: %d\n", ret);
 		goto fail2;
 	}
-	mdelay(2);
+//	mdelay(2);
+	msleep_interruptible(8);
 	gpio_set_value_cansleep(panel_jdi->pmic8921_23, 1);
+	msleep(20);
 	gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
-        mdelay(1);
-        gpio_set_value_cansleep(panel_jdi->pmic8921_23, 0);
-        gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 0);
-        usleep(50);
-        gpio_set_value_cansleep(panel_jdi->pmic8921_23, 1);
-        gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
+	msleep(20);
 
 	return 0;
 
@@ -225,7 +222,6 @@ static int panel_jdi_on(struct panel *panel)
                          0x70, 0x07, 0x01,
                          0x00, 0x14, 0x03, 0x00, 0x02, /*common 8064*/
                          0x0e, 0x01, 0x00, 0x01}, /* common 8064*/
-
 		},
 	});
 
@@ -235,7 +231,9 @@ static int panel_jdi_on(struct panel *panel)
 	});
 
 	mipi_on(mipi);
+	mipi->wait=5;
 	mipi_dcs_swrite(mipi, true, 0, false, sw_reset[0]);
+	mipi->wait=0;
 	mipi_gen_write(mipi, true, 0, MCAP);
 	mipi_lwrite(mipi, true, 0, interface_setting);
 	mipi_lwrite(mipi, true, 0, interface_ID_setting);
@@ -251,8 +249,10 @@ static int panel_jdi_on(struct panel *panel)
 	mipi_lwrite(mipi, true, 0, backlight_control4);
 	mipi_dcs_swrite(mipi, true, 0, false, set_pixel_format[0]);
 	mipi_dcs_swrite(mipi, true, 0, false, set_column_addr[0]);
+	mipi->wait=120;
 	mipi_dcs_swrite(mipi, true, 0, false, set_page_addr[0]);
         mdelay(20);
+	mipi->wait=0;
         mipi_dcs_swrite(mipi, true, 0, false, exit_sleep[0]);
         mdelay(5);
         mipi_dcs_swrite(mipi, true, 0, false, display_on[0]);
@@ -263,7 +263,7 @@ static int panel_jdi_on(struct panel *panel)
         mdelay(5);
 	bl_value[1] = 0x60;//TODO: need to map with pwm - pm8921_gpio_26
 	mipi_gen_write(mipi, true, 0, bl_value);
-	
+
 	return 0;
 }
 
@@ -274,15 +274,19 @@ static int panel_jdi_off(struct panel *panel)
 	int ret;
 
 	DRM_DEBUG_KMS("panel off\n");
+
 	mipi_set_bus_config(mipi, &(struct mipi_bus_config){
 		.low_power = true,
 		.lanes = 0xf,
 	});
 
+	mipi->wait=20;
 	mipi_dcs_swrite(mipi, true, 0, false, display_off[0]);
 	mdelay(5);
+	mipi->wait=80;
 	mipi_dcs_swrite(mipi, true, 0, false, enter_sleep[0]);
 	mdelay(5);
+	mipi->wait=0;
 	mipi_dcs_swrite(mipi, true, 0, false, set_tear_off[0]);
 	mdelay(5);
 
@@ -298,20 +302,28 @@ static int panel_jdi_off(struct panel *panel)
 static struct drm_display_mode *panel_jdi_mode(struct panel *panel)
 {
 	struct drm_display_mode *mode = drm_mode_create(panel->dev);
+	u32 hbp, hfp, vbp, vfp, hspw, vspw;
 
-	snprintf(mode->name, sizeof(mode->name), "1920x1200");
+	snprintf(mode->name, sizeof(mode->name), "1200x1920");
 
 	mode->clock = 1000000;
 
-	mode->hdisplay = 1920;
-	mode->hsync_start = mode->hdisplay + 60;
-	mode->hsync_end = mode->hsync_start + 48;
-	mode->htotal = mode->hsync_end + 32;
+	hbp = 60;
+	hfp = 48;
+	vbp = 6;
+	vfp = 3;
+	hspw = 32;
+	vspw = 5;
 
-	mode->vdisplay = 1200;
-	mode->vsync_start = mode->vdisplay + 6;
-	mode->vsync_end = mode->vsync_start + 3;
-	mode->vtotal = mode->vsync_end + 5;
+	mode->hdisplay = 1200;
+	mode->hsync_start = mode->hdisplay + hfp;
+	mode->hsync_end = mode->hsync_start + hspw;
+	mode->htotal = mode->hsync_end + hbp;
+
+	mode->vdisplay = 1920;
+	mode->vsync_start = mode->vdisplay + vfp;
+	mode->vsync_end = mode->vsync_start + vspw;
+	mode->vtotal = mode->vsync_end + vbp;
 
 	mode->flags = 0;
 
@@ -379,12 +391,17 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 		dev_err(dev->dev, "failed to request LCM_XRES : %d\n", ret);
 		goto fail;
 	}
+/*
 	ret = gpio_export(panel_jdi->gpio_LCM_XRES_SR2, true);
 	if (ret) {
 		dev_err(dev->dev, "failed to request gpio export mpp: %d\n", ret);
 		goto fail;
 	}
-	ret = gpio_direction_output(panel_jdi->gpio_LCM_XRES_SR2, 0);
+	ret = gpio_direction_input(panel_jdi->gpio_LCM_XRES_SR2);
+*/	ret = gpio_tlmm_config(
+		GPIO_CFG(panel_jdi->gpio_LCM_XRES_SR2, 0,
+			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+			GPIO_CFG_ENABLE);
 	if (ret) {
 		dev_err(dev->dev, "failed to request gpio direction output mpp: %d\n", ret);
 		goto fail;

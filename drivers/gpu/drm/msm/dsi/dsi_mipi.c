@@ -107,7 +107,7 @@ static int dsi_mipi_set_panel_config(struct mipi_adapter *mipi,
 				DSI_VID_CFG1_INTERLEAVE_MAX(pcfg->interleave_max) |
 				DSI_VID_CFG1_RGB_SWAP(pcfg->rgb_swap) |
 				DSI_CMD_CFG0_DST_FORMAT(pcfg->format));
-		dsi_write(dsi, REG_DSI_CMD_OFFSET,
+		dsi_write(dsi, REG_DSI_CMD_CFG1,
 				DSI_CMD_CTRL_MEM_CONTINUE(pcfg->wr_mem_continue) |
 				DSI_CMD_CTRL_MEM_START(pcfg->wr_mem_start) |
 				COND(pcfg->insert_dcs_cmd, DSI_CMD_INSERT_DCS_CMD));
@@ -156,6 +156,21 @@ static int dsi_mipi_set_panel_config(struct mipi_adapter *mipi,
 	return 0;
 }
 
+static void dsi_mipi_cmd_mdp_busy(struct mipi_adapter *mipi)
+{
+        struct dsi_mipi_adapter *dsi_mipi = to_dsi_mipi_adapter(mipi);
+        struct dsi *dsi = dsi_mipi->dsi;
+        uint32_t cnt = 0xffff;
+
+        /* wait for command mode to complete: */
+        do {
+                uint32_t status = dsi_read(dsi, REG_DSI_STATUS0);
+                if (!(status & DSI_STATUS0_CMD_MODE_DMA_BUSY))
+                        break;
+                udelay(100);
+        } while (--cnt > 0);
+}
+
 static int dsi_mipi_on(struct mipi_adapter *mipi)
 {
 	struct dsi_mipi_adapter *dsi_mipi = to_dsi_mipi_adapter(mipi);
@@ -163,22 +178,25 @@ static int dsi_mipi_on(struct mipi_adapter *mipi)
 	struct dsi_phy *phy = dsi->phy;
 	uint32_t ctrl;
 
+	dsi_mipi_cmd_mdp_busy(mipi);
+
 	dsi_clk_prepare(dsi);
 	dsi_clk_enable_ahb(dsi);
 
 	phy->funcs->powerup(phy, 0/*dsi_bridge->pixclock*/);
 
 	ctrl = dsi_read(dsi, REG_DSI_CTRL);
-//	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE );
 
 	/* required for dsi video mode panel */
-/*
+	/*
 	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_VID_MODE_EN);
-*/
+	*/
+
 	/* required for dsi command mode panel */
 	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_CMD_MODE_EN);
 	dsi_write(dsi, REG_DSI_INTR_CTRL,
-			DSI_IRQ_CMD_DMA_DONE | DSI_IRQ_MASK_CMD_DMA_DONE |
+			DSI_IRQ_CMD_DMA_DONE | DSI_IRQ_CMD_MDP_DONE |
+			DSI_IRQ_MASK_CMD_DMA_DONE |
 			DSI_IRQ_ERROR | DSI_IRQ_MASK_ERROR);
 
 	phy->funcs->phy_clk_enable(phy);
@@ -191,6 +209,8 @@ static int dsi_mipi_off(struct mipi_adapter *mipi)
 	struct dsi_mipi_adapter *dsi_mipi = to_dsi_mipi_adapter(mipi);
 	struct dsi *dsi = dsi_mipi->dsi;
 	struct dsi_phy *phy = dsi->phy;
+
+	dsi_mipi_cmd_mdp_busy(mipi);
 
 	phy->funcs->phy_clk_disable(phy);
 
@@ -215,6 +235,8 @@ static int dsi_mipi_write(struct mipi_adapter *mipi, const u8 *data, size_t len)
 	len = ALIGN(len, 4);
 
 	memcpy(dsi_mipi->buf, data, len);
+
+	dsi_mipi_cmd_mdp_busy(mipi);
 
 	ctrl = dsi_read(dsi, REG_DSI_CTRL);
 	if (ctrl & DSI_CTRL_VID_MODE_EN) {
