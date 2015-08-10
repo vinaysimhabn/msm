@@ -140,8 +140,19 @@ static void mdp4_dsi_encoder_mode_set(struct drm_encoder *encoder,
 	uint32_t dsi_hsync_skew, vsync_period, vsync_len, ctrl_pol;
 	uint32_t display_v_start, display_v_end;
 	uint32_t hsync_start_x, hsync_end_x;
+	uint32_t vsync_cnt_cfg;
+	uint32_t vsync_cnt_cfg_dem;
+	uint32_t refx100 = 6032;
+	uint32_t mdp_vsync_clk_speed_hz = 27000000;
+	int vsync_above_th = 4;
+	int vsync_start_th = 1;
+	uint32_t cfg;
+	uint32_t data;
 
 	mode = adjusted_mode;
+
+	vsync_cnt_cfg_dem = (refx100 * mode->vtotal) / 100;
+	vsync_cnt_cfg = (mdp_vsync_clk_speed_hz) / vsync_cnt_cfg_dem;
 
 	DBG("set mode: %d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x",
 			mode->base.id, mode->name,
@@ -152,6 +163,31 @@ static void mdp4_dsi_encoder_mode_set(struct drm_encoder *encoder,
 			mode->vsync_end, mode->vtotal,
 			mode->type, mode->flags);
 
+	cfg = mode->vtotal - 1;
+	cfg <<= REG_MDP4_SYNCFG_HGT_LOC;
+	cfg |= REG_MDP4_SYNCFG_VSYNC_EXT_EN;
+	cfg |= (REG_MDP4_SYNCFG_VSYNC_INT_EN | vsync_cnt_cfg);
+
+	mdp4_write(mdp4_kms, REG_MDP4_SYNC_CFG_0, cfg);
+
+	 /* line counter init value at the next pulse */
+	mdp4_write(mdp4_kms, REG_MDP4_PRIM_VSYNC_INIT_VAL, mode->vdisplay);
+	/*
+	* external vsync source pulse width and
+	* polarity flip
+	*/
+	mdp4_write(mdp4_kms, REG_MDP4_PRIM_VSYNC_OUT_CTRL, 0);
+	/* threshold */
+	mdp4_write(mdp4_kms, 0x200,  (vsync_above_th << 16) |
+         (vsync_start_th));
+	/* MDP cmd block disable */
+
+	mdp4_write(mdp4_kms, 0x210, mode->vtotal - 1);
+	data = mdp4_read(mdp4_kms, 0x20c);
+	data |= (1<<0);
+	mdp4_write(mdp4_kms, 0x20c, data);
+
+if(0){
 	ctrl_pol = 0;
 	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
 		ctrl_pol |= MDP4_DSI_CTRL_POLARITY_HSYNC_LOW;
@@ -192,6 +228,7 @@ static void mdp4_dsi_encoder_mode_set(struct drm_encoder *encoder,
 	mdp4_write(mdp4_kms, REG_MDP4_DSI_ACTIVE_VSTART, 0);
 	mdp4_write(mdp4_kms, REG_MDP4_DSI_ACTIVE_VEND, 0);
 }
+}
 
 static void mdp4_dsi_encoder_prepare(struct drm_encoder *encoder)
 {
@@ -209,7 +246,7 @@ static void mdp4_dsi_encoder_commit(struct drm_encoder *encoder)
                         MDP4_DMA_CONFIG_B_BPC(BPC8) |
                         MDP4_DMA_CONFIG_PACK(0x21));
         //mdp4_crtc_set_intf(encoder->crtc, INTF_DSI_VIDEO,0);
-        mdp4_crtc_set_intf(encoder->crtc, INTF_DSI_CMD,0);
+	mdp4_crtc_set_intf(encoder->crtc, INTF_DSI_CMD, 0);
 
 	mdp4_dsi_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
 }

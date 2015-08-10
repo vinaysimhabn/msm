@@ -188,6 +188,7 @@ VREG_CONSUMERS(S4) = {
 	REGULATOR_SUPPLY("vcc_i2c",		"3-0024"),
 	REGULATOR_SUPPLY("vddp",		"0-0048"),
 	REGULATOR_SUPPLY("hdmi_lvl_tsl",	"hdmi_msm.0"),
+	REGULATOR_SUPPLY("dsi1_s4_iovdd",	"mdp.0"),
 };
 VREG_CONSUMERS(S5) = {
 	REGULATOR_SUPPLY("8921_s5",		NULL),

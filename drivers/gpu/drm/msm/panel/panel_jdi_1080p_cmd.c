@@ -37,9 +37,12 @@ struct panel_jdi {
 	struct regulator *reg_lvs7_vddio;
 	struct regulator *reg_l17;
 	struct regulator *reg_lvs5;
+	struct regulator *reg_s4_iovdd;
 	int pmic8921_23; /* panel VCC */
 	int gpio_LCM_XRES_SR2; /* JDI reset pin */
 	int gpio_LCM_TE; /* JDI te pin */
+	int gpio_LCD_BL_EN;
+	int gpio_LCD_BL_PWM;
 };
 #define to_panel_jdi(x) container_of(x, struct panel_jdi, base)
 
@@ -96,9 +99,20 @@ static int panel_jdi_power_on(struct panel *panel)
 	struct panel_jdi *panel_jdi = to_panel_jdi(panel);
 	int ret = 0;
 
+	ret = regulator_set_optimum_mode(panel_jdi->reg_s4_iovdd, 100000);
+	if (ret < 0) {
+		dev_err(dev->dev, "failed to set s4 mode: %d\n", ret);
+		goto fail1;
+	}
 	ret = regulator_set_optimum_mode(panel_jdi->reg_l11_avdd, 110000);
 	if (ret < 0) {
 		dev_err(dev->dev, "failed to set l11 mode: %d\n", ret);
+		goto fail1;
+	}
+
+	ret = regulator_enable(panel_jdi->reg_s4_iovdd);
+	if (ret) {
+		dev_err(dev->dev, "failed to enable s4: %d\n", ret);
 		goto fail1;
 	}
 	
@@ -127,11 +141,22 @@ static int panel_jdi_power_on(struct panel *panel)
 		goto fail2;
 	}
 //	mdelay(2);
+
+	gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
+        mdelay(1);/*Reset display 1 ms*/
+        gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 0);
+        usleep(50);
+        gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
+        mdelay(5);
+
 	msleep_interruptible(8);
 	gpio_set_value_cansleep(panel_jdi->pmic8921_23, 1);
 	msleep(20);
-	gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
-	msleep(20);
+	//gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
+	//msleep(20);
+
+	gpio_set_value_cansleep(panel_jdi->gpio_LCD_BL_EN, 1);
+	gpio_set_value_cansleep(panel_jdi->gpio_LCD_BL_PWM, 1);
 
 	return 0;
 
@@ -149,11 +174,17 @@ static int panel_jdi_power_off(struct panel *panel)
 	struct panel_jdi *panel_jdi = to_panel_jdi(panel);
 	int ret;
 
+	gpio_set_value_cansleep(panel_jdi->gpio_LCD_BL_EN, 0);
 	gpio_set_value_cansleep(panel_jdi->pmic8921_23, 0);
 	udelay(100);
 	gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 0);
 	udelay(100);
 
+	ret = regulator_disable(panel_jdi->reg_s4_iovdd);
+	if (ret)
+		dev_err(dev->dev, "failed to disable s4: %d\n", ret);
+
+	udelay(100);
 	ret = regulator_disable(panel_jdi->reg_l11_avdd);
 	if (ret)
 		dev_err(dev->dev, "failed to disable l8: %d\n", ret);
@@ -231,6 +262,9 @@ static int panel_jdi_on(struct panel *panel)
 	});
 
 	mipi_on(mipi);
+
+	mipi_dcs_swrite(mipi, true, 0, false, set_tear_on[0]);
+        mdelay(5);
 	mipi->wait=5;
 	mipi_dcs_swrite(mipi, true, 0, false, sw_reset[0]);
 	mipi->wait=0;
@@ -256,8 +290,6 @@ static int panel_jdi_on(struct panel *panel)
         mipi_dcs_swrite(mipi, true, 0, false, exit_sleep[0]);
         mdelay(5);
         mipi_dcs_swrite(mipi, true, 0, false, display_on[0]);
-        mdelay(5);
-	mipi_dcs_swrite(mipi, true, 0, false, set_tear_on[0]);
         mdelay(5);
 	mipi_gen_write(mipi, true, 0, bl_value);
         mdelay(5);
@@ -367,6 +399,39 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 	 * but we can sort that out when there is some other device that
 	 * uses the same panel.
 	 */
+	panel_jdi->gpio_LCD_BL_PWM = PM8921_GPIO_PM_TO_SYS(26);
+	ret = gpio_request(panel_jdi->gpio_LCD_BL_PWM, "pwm_backlight_ctrl");
+	if (ret) {
+		dev_err(dev->dev, "failed to request LCD_BL_EN : %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_export(panel_jdi->gpio_LCD_BL_PWM, true);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio export LCD_BL_PWM: %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_direction_output(panel_jdi->gpio_LCD_BL_PWM, 0);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio direction output LCD_BL_PWM: %d\n", ret);
+		goto fail;
+	}
+
+	panel_jdi->gpio_LCD_BL_EN = PM8921_GPIO_PM_TO_SYS(36);
+	ret = gpio_request(panel_jdi->gpio_LCD_BL_EN, "LCD_BL_EN");
+	if (ret) {
+		dev_err(dev->dev, "failed to request LCD_BL_EN : %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_export(panel_jdi->gpio_LCD_BL_EN, true);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio export LCD_BL_EN: %d\n", ret);
+		goto fail;
+	}
+	ret = gpio_direction_output(panel_jdi->gpio_LCD_BL_EN, 0);
+	if (ret) {
+		dev_err(dev->dev, "failed to request gpio direction output LCD_BL_EN: %d\n", ret);
+		goto fail;
+	}
 
 	panel_jdi->pmic8921_23 = PM8921_GPIO_PM_TO_SYS(23);
 	ret = gpio_request(panel_jdi->pmic8921_23, "EN_VDD_BL");
@@ -391,19 +456,19 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 		dev_err(dev->dev, "failed to request LCM_XRES : %d\n", ret);
 		goto fail;
 	}
-/*
+
 	ret = gpio_export(panel_jdi->gpio_LCM_XRES_SR2, true);
 	if (ret) {
 		dev_err(dev->dev, "failed to request gpio export mpp: %d\n", ret);
 		goto fail;
 	}
-	ret = gpio_direction_input(panel_jdi->gpio_LCM_XRES_SR2);
-*/	ret = gpio_tlmm_config(
+	ret = gpio_direction_output(panel_jdi->gpio_LCM_XRES_SR2, 0);
+/*	ret = gpio_tlmm_config(
 		GPIO_CFG(panel_jdi->gpio_LCM_XRES_SR2, 0,
 			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 			GPIO_CFG_ENABLE);
-	if (ret) {
-		dev_err(dev->dev, "failed to request gpio direction output mpp: %d\n", ret);
+*/	if (ret) {
+		dev_err(dev->dev, "failed to request gpio direction output XRES: %d\n", ret);
 		goto fail;
 	}
 
@@ -424,6 +489,12 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 		goto fail;
 	}
 
+	panel_jdi->reg_s4_iovdd = devm_regulator_get(dev->dev, "dsi1_s4_iovdd");
+	if (IS_ERR(panel_jdi->reg_s4_iovdd)) {
+		ret = PTR_ERR(panel_jdi->reg_s4_iovdd);
+		dev_err(dev->dev, "failed to request dsi_iovdd regulator: %d\n", ret);
+		goto fail;
+	}
 	panel_jdi->reg_l11_avdd = devm_regulator_get(dev->dev, "dsi1_avdd");
 	if (IS_ERR(panel_jdi->reg_l11_avdd)) {
 		ret = PTR_ERR(panel_jdi->reg_l11_avdd);
@@ -449,6 +520,12 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 	if (IS_ERR(panel_jdi->reg_lvs5)) {
 		ret = PTR_ERR(panel_jdi->reg_lvs5);
 		dev_err(dev->dev, "failed to request lvs5 regulator: %d\n", ret);
+		goto fail;
+	}
+
+	ret = regulator_set_voltage(panel_jdi->reg_s4_iovdd,  1800000, 1800000);
+	if (ret) {
+		dev_err(dev->dev, "set_voltage s4 failed: %d\n", ret);
 		goto fail;
 	}
 
