@@ -40,9 +40,8 @@ struct panel_jdi {
 	struct regulator *reg_s4_iovdd;
 	int pmic8921_23; /* panel VCC */
 	int gpio_LCM_XRES_SR2; /* JDI reset pin */
-	int gpio_LCM_TE; /* JDI te pin */
 	int gpio_LCD_BL_EN;
-	int gpio_LCD_BL_PWM;
+	int te_gpio;
 };
 #define to_panel_jdi(x) container_of(x, struct panel_jdi, base)
 
@@ -141,6 +140,11 @@ static int panel_jdi_power_on(struct panel *panel)
 		goto fail2;
 	}
 //	mdelay(2);
+	msleep_interruptible(8);
+	gpio_set_value_cansleep(panel_jdi->pmic8921_23, 1);
+	msleep(20);
+
+	gpio_set_value_cansleep(panel_jdi->gpio_LCD_BL_EN, 1);
 
 	gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
         mdelay(1);/*Reset display 1 ms*/
@@ -148,15 +152,6 @@ static int panel_jdi_power_on(struct panel *panel)
         usleep(50);
         gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
         mdelay(5);
-
-	msleep_interruptible(8);
-	gpio_set_value_cansleep(panel_jdi->pmic8921_23, 1);
-	msleep(20);
-	//gpio_set_value_cansleep(panel_jdi->gpio_LCM_XRES_SR2, 1);
-	//msleep(20);
-
-	gpio_set_value_cansleep(panel_jdi->gpio_LCD_BL_EN, 1);
-	gpio_set_value_cansleep(panel_jdi->gpio_LCD_BL_PWM, 1);
 
 	return 0;
 
@@ -221,8 +216,8 @@ static int panel_jdi_on(struct panel *panel)
 	mipi_set_panel_config(mipi, &(struct mipi_panel_config){
 		.cmd_mode = true,
 		.interleave_max = true,
-		.rgb_swap = SWAP_BGR,
-		.format = DST_FORMAT_RGB888,
+		.rgb_swap = SWAP_RGB,
+		.format = CMD_DST_FORMAT_RGB888,
 		.insert_dcs_cmd = true,
 		.wr_mem_continue = 0x3c,
 		.wr_mem_start = 0x2c,
@@ -257,13 +252,17 @@ static int panel_jdi_on(struct panel *panel)
 	});
 
 	mipi_set_bus_config(mipi, &(struct mipi_bus_config){
-		.low_power = false,
+		.low_power = true,
 		.lanes = 0xf,
 	});
 
 	mipi_on(mipi);
 
-	mipi_dcs_swrite(mipi, true, 0, false, set_tear_on[0]);
+	// if (lcd_pwm == LCD_PWM_TYPE_B) { /* set pwm frequency to 22K */
+	backlight_control4[18] = 0x04;
+	backlight_control4[19] = 0x00;
+
+	mipi_dcs_swrite1(mipi, true, 0, false, set_tear_on);
         mdelay(5);
 	mipi->wait=5;
 	mipi_dcs_swrite(mipi, true, 0, false, sw_reset[0]);
@@ -273,15 +272,15 @@ static int panel_jdi_on(struct panel *panel)
 	mipi_lwrite(mipi, true, 0, interface_ID_setting);
 	mipi_lwrite(mipi, true, 0, DSI_control);
 	mipi_gen_write(mipi, true, 0, LTPS_timing_setting);
-	mipi_gen_write(mipi, true, 0, sequencer_timing_control);
-	mipi_gen_write(mipi, true, 0, write_display_brightness);
-	mipi_gen_write(mipi, true, 0, write_control_display);
-	mipi_gen_write(mipi, true, 0, write_cabc);
+	mipi_dcs_swrite1(mipi, true, 0, false, sequencer_timing_control);
+	mipi_dcs_swrite1(mipi, true, 0, false, write_display_brightness);
+	mipi_dcs_swrite1(mipi, true, 0, false, write_control_display);
+	mipi_dcs_swrite1(mipi, true, 0, false, write_cabc);
 	mipi_lwrite(mipi, true, 0, backlight_control1);
 	mipi_lwrite(mipi, true, 0, backlight_control2);
 	mipi_lwrite(mipi, true, 0, backlight_control3);
 	mipi_lwrite(mipi, true, 0, backlight_control4);
-	mipi_dcs_swrite(mipi, true, 0, false, set_pixel_format[0]);
+	mipi_dcs_swrite1(mipi, true, 0, false, set_pixel_format);
 	mipi_dcs_swrite(mipi, true, 0, false, set_column_addr[0]);
 	mipi->wait=120;
 	mipi_dcs_swrite(mipi, true, 0, false, set_page_addr[0]);
@@ -319,7 +318,7 @@ static int panel_jdi_off(struct panel *panel)
 	mipi_dcs_swrite(mipi, true, 0, false, enter_sleep[0]);
 	mdelay(5);
 	mipi->wait=0;
-	mipi_dcs_swrite(mipi, true, 0, false, set_tear_off[0]);
+	mipi_dcs_swrite1(mipi, true, 0, false, set_tear_off);
 	mdelay(5);
 
 	mipi_off(mipi);
@@ -399,23 +398,6 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 	 * but we can sort that out when there is some other device that
 	 * uses the same panel.
 	 */
-	panel_jdi->gpio_LCD_BL_PWM = PM8921_GPIO_PM_TO_SYS(26);
-	ret = gpio_request(panel_jdi->gpio_LCD_BL_PWM, "pwm_backlight_ctrl");
-	if (ret) {
-		dev_err(dev->dev, "failed to request LCD_BL_EN : %d\n", ret);
-		goto fail;
-	}
-	ret = gpio_export(panel_jdi->gpio_LCD_BL_PWM, true);
-	if (ret) {
-		dev_err(dev->dev, "failed to request gpio export LCD_BL_PWM: %d\n", ret);
-		goto fail;
-	}
-	ret = gpio_direction_output(panel_jdi->gpio_LCD_BL_PWM, 0);
-	if (ret) {
-		dev_err(dev->dev, "failed to request gpio direction output LCD_BL_PWM: %d\n", ret);
-		goto fail;
-	}
-
 	panel_jdi->gpio_LCD_BL_EN = PM8921_GPIO_PM_TO_SYS(36);
 	ret = gpio_request(panel_jdi->gpio_LCD_BL_EN, "LCD_BL_EN");
 	if (ret) {
@@ -449,7 +431,24 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 		dev_err(dev->dev, "failed to request gpio direction output mpp: %d\n", ret);
 		goto fail;
 	}
-	
+
+ 	panel_jdi->te_gpio = 0;
+        ret = gpio_request(panel_jdi->te_gpio, "MDP_VSYNC");
+        if (ret) {
+                dev_err(dev->dev, "failed to request LCM_TE : %d\n", ret);
+		goto fail;
+        }
+        ret = gpio_export(panel_jdi->te_gpio, true);
+        if (ret) {
+                dev_err(dev->dev, "failed to request gpio export lcm_te: %d\n", ret);
+		goto fail;
+        }
+        ret = gpio_direction_input(panel_jdi->te_gpio);
+        if (ret) {
+                dev_err(dev->dev, "failed to request gpio direction input lcm_te: %d\n", ret);
+		goto fail;
+        }
+		
 	panel_jdi->gpio_LCM_XRES_SR2 = 54;
 	ret = gpio_request(panel_jdi->gpio_LCM_XRES_SR2, "LCM_XRES");
 	if (ret) {
@@ -469,23 +468,6 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 			GPIO_CFG_ENABLE);
 */	if (ret) {
 		dev_err(dev->dev, "failed to request gpio direction output XRES: %d\n", ret);
-		goto fail;
-	}
-
-	panel_jdi->gpio_LCM_TE = 0;
-	ret = gpio_request(panel_jdi->gpio_LCM_TE, "MDP_VSYNC");
-	if (ret) {
-		dev_err(dev->dev, "failed to request LCM_TE : %d\n", ret);
-		goto fail;
-	}
-	ret = gpio_export(panel_jdi->gpio_LCM_TE, true);
-	if (ret) {
-		dev_err(dev->dev, "failed to request gpio export lcm_te: %d\n", ret);
-		goto fail;
-	}
-	ret = gpio_direction_input(panel_jdi->gpio_LCM_TE);
-	if (ret) {
-		dev_err(dev->dev, "failed to request gpio direction input lcm_te: %d\n", ret);
 		goto fail;
 	}
 
@@ -530,6 +512,12 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 	}
 
 	ret = regulator_set_voltage(panel_jdi->reg_l11_avdd,  3000000, 3000000);
+	if (ret) {
+		dev_err(dev->dev, "set_voltage l8 failed: %d\n", ret);
+		goto fail;
+	}
+	
+	ret = regulator_set_voltage(panel_jdi->reg_l17,  3000000, 3000000);
 	if (ret) {
 		dev_err(dev->dev, "set_voltage l8 failed: %d\n", ret);
 		goto fail;

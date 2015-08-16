@@ -104,8 +104,8 @@ static int dsi_mipi_set_panel_config(struct mipi_adapter *mipi,
 
 	if (pcfg->cmd_mode) {
 		dsi_write(dsi, REG_DSI_CMD_CFG0,
-				DSI_VID_CFG1_INTERLEAVE_MAX(pcfg->interleave_max) |
-				DSI_VID_CFG1_RGB_SWAP(pcfg->rgb_swap) |
+				DSI_CMD_CFG0_INTERLEAVE_MAX(pcfg->interleave_max) |
+				DSI_CMD_CFG0_RGB_SWAP(pcfg->rgb_swap) |
 				DSI_CMD_CFG0_DST_FORMAT(pcfg->format));
 		dsi_write(dsi, REG_DSI_CMD_CFG1,
 				DSI_CMD_CTRL_MEM_CONTINUE(pcfg->wr_mem_continue) |
@@ -139,8 +139,8 @@ static int dsi_mipi_set_panel_config(struct mipi_adapter *mipi,
 			DSI_CLKOUT_TIMING_CTRL_T_CLK_PRE(pcfg->t_clk_pre) |
 			DSI_CLKOUT_TIMING_CTRL_T_CLK_POST(pcfg->t_clk_post));
 	dsi_write(dsi, REG_DSI_EOT_PACKET_CTRL,
-			COND(pcfg->rx_eot_ignore, DSI_EOT_PACKET_CTRL_TX_EOT_APPEND) |
-			COND(pcfg->tx_eot_append, DSI_EOT_PACKET_CTRL_RX_EOT_IGNORE));
+			COND(pcfg->tx_eot_append, DSI_EOT_PACKET_CTRL_TX_EOT_APPEND) |
+			COND(pcfg->rx_eot_ignore, DSI_EOT_PACKET_CTRL_RX_EOT_IGNORE));
 
 	dsi_write(dsi, REG_DSI_ERR_INT_MASK0, 0x13ff3fe0);  /* ??? */
 	dsi_write(dsi, REG_DSI_CLK_CTRL, 0x23f);
@@ -148,6 +148,12 @@ static int dsi_mipi_set_panel_config(struct mipi_adapter *mipi,
 	ctrl = dsi_read(dsi, REG_DSI_CTRL);
 	ctrl &= DSI_CTRL_ENABLE | DSI_CTRL_VID_MODE_EN | DSI_CTRL_CMD_MODE_EN |
 			DSI_CTRL_LANE0 | DSI_CTRL_LANE1 | DSI_CTRL_LANE2 | DSI_CTRL_LANE3;
+
+	if (pcfg->cmd_mode)
+		ctrl |= DSI_CTRL_CMD_MODE_EN;
+	else
+		ctrl |= DSI_CTRL_VID_MODE_EN;
+
 	dsi_write(dsi, REG_DSI_CTRL,
 			ctrl |
 			DSI_CTRL_CLK_EN |
@@ -155,14 +161,13 @@ static int dsi_mipi_set_panel_config(struct mipi_adapter *mipi,
 			COND(pcfg->crc_check, DSI_CTRL_CRC_CHECK));
 	return 0;
 }
-
+/*
 static void dsi_mipi_cmd_mdp_busy(struct mipi_adapter *mipi)
 {
         struct dsi_mipi_adapter *dsi_mipi = to_dsi_mipi_adapter(mipi);
         struct dsi *dsi = dsi_mipi->dsi;
         uint32_t cnt = 0xffff;
 
-        /* wait for command mode to complete: */
         do {
                 uint32_t status = dsi_read(dsi, REG_DSI_STATUS0);
                 if (!(status & DSI_STATUS0_CMD_MODE_DMA_BUSY))
@@ -170,7 +175,7 @@ static void dsi_mipi_cmd_mdp_busy(struct mipi_adapter *mipi)
                 udelay(100);
         } while (--cnt > 0);
 }
-
+*/
 static int dsi_mipi_on(struct mipi_adapter *mipi)
 {
 	struct dsi_mipi_adapter *dsi_mipi = to_dsi_mipi_adapter(mipi);
@@ -178,7 +183,7 @@ static int dsi_mipi_on(struct mipi_adapter *mipi)
 	struct dsi_phy *phy = dsi->phy;
 	uint32_t ctrl;
 
-	dsi_mipi_cmd_mdp_busy(mipi);
+//	dsi_mipi_cmd_mdp_busy(mipi);
 
 	dsi_clk_prepare(dsi);
 	dsi_clk_enable_ahb(dsi);
@@ -187,13 +192,8 @@ static int dsi_mipi_on(struct mipi_adapter *mipi)
 
 	ctrl = dsi_read(dsi, REG_DSI_CTRL);
 
-	/* required for dsi video mode panel */
-	/*
-	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_VID_MODE_EN);
-	*/
+	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE);
 
-	/* required for dsi command mode panel */
-	dsi_write(dsi, REG_DSI_CTRL, ctrl | DSI_CTRL_ENABLE | DSI_CTRL_CMD_MODE_EN);
 	dsi_write(dsi, REG_DSI_INTR_CTRL,
 			DSI_IRQ_CMD_DMA_DONE | DSI_IRQ_CMD_MDP_DONE |
 			DSI_IRQ_MASK_CMD_DMA_DONE |
@@ -210,7 +210,7 @@ static int dsi_mipi_off(struct mipi_adapter *mipi)
 	struct dsi *dsi = dsi_mipi->dsi;
 	struct dsi_phy *phy = dsi->phy;
 
-	dsi_mipi_cmd_mdp_busy(mipi);
+//	dsi_mipi_cmd_mdp_busy(mipi);
 
 	phy->funcs->phy_clk_disable(phy);
 
@@ -231,12 +231,22 @@ static int dsi_mipi_write(struct mipi_adapter *mipi, const u8 *data, size_t len)
 	struct dsi *dsi = dsi_mipi->dsi;
 	uint32_t ctrl;
 	int ret = len;
+	int i;
+	char *bp;
 
 	len = ALIGN(len, 4);
 
 	memcpy(dsi_mipi->buf, data, len);
 
-	dsi_mipi_cmd_mdp_busy(mipi);
+        bp = dsi_mipi->buf;
+        printk("DSI:TX -> ");
+        for (i = 0; i < len; i++)
+        printk("%x ", *bp++);
+        printk("\n");
+
+//	dsi_mipi_cmd_mdp_busy(mipi);
+
+	dsi_clk_prepare(dsi);
 
 	ctrl = dsi_read(dsi, REG_DSI_CTRL);
 	if (ctrl & DSI_CTRL_VID_MODE_EN) {
@@ -269,6 +279,8 @@ static int dsi_mipi_write(struct mipi_adapter *mipi, const u8 *data, size_t len)
 
 	if (ctrl & DSI_CTRL_VID_MODE_EN)
 		dsi_write(dsi, REG_DSI_CTRL, ctrl);
+
+	dsi_clk_unprepare(dsi);
 
 	return ret;
 }

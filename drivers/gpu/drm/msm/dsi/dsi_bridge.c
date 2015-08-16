@@ -97,40 +97,48 @@ static void dsi_bridge_mode_set(struct drm_bridge *bridge,
 
 	DBG("htotal=%d, vtotal=%d, hstart=%d, hend=%d, vstart=%d, vend=%d",
 			mode->htotal, mode->vtotal, hstart, hend, vstart, vend);
-if(0){/* for video mode panel */
-	dsi_write(dsi, REG_DSI_ACTIVE_H,
-			DSI_ACTIVE_H_START(hstart) |
-			DSI_ACTIVE_H_END(hend));
-	dsi_write(dsi, REG_DSI_ACTIVE_V,
-			DSI_ACTIVE_V_START(vstart) |
-			DSI_ACTIVE_V_END(vend));
 
-	dsi_write(dsi, REG_DSI_TOTAL,
-			DSI_TOTAL_H_TOTAL(mode->htotal - 1) |
-			DSI_TOTAL_V_TOTAL(mode->vtotal - 1));
+	if(mode->flags & MIPI_DSI_MODE_VIDEO){
+	/* video mode panel */
+		DBG("DSI : VIDEO PANEL : Timings");
+		dsi_write(dsi, REG_DSI_ACTIVE_H,
+				DSI_ACTIVE_H_START(hstart) |
+				DSI_ACTIVE_H_END(hend));
+		dsi_write(dsi, REG_DSI_ACTIVE_V,
+				DSI_ACTIVE_V_START(vstart) |
+				DSI_ACTIVE_V_END(vend));
 
-	dsi_write(dsi, REG_DSI_ACTIVE_HSYNC,
-			DSI_ACTIVE_HSYNC_START(0) |
-			DSI_ACTIVE_HSYNC_END(mode->hsync_end - mode->hsync_start));
-	dsi_write(dsi, 0x30, 0); /* ??? */
-	dsi_write(dsi, REG_DSI_ACTIVE_VSYNC,
-			DSI_ACTIVE_VSYNC_START(0) |
-			DSI_ACTIVE_VSYNC_END(mode->vsync_end - mode->vsync_start));
-}
+		dsi_write(dsi, REG_DSI_TOTAL,
+				DSI_TOTAL_H_TOTAL(mode->htotal - 1) |
+				DSI_TOTAL_V_TOTAL(mode->vtotal - 1));
+
+		dsi_write(dsi, REG_DSI_ACTIVE_HSYNC,
+				DSI_ACTIVE_HSYNC_START(0) |
+				DSI_ACTIVE_HSYNC_END(mode->hsync_end -
+				mode->hsync_start));
+		dsi_write(dsi, 0x30, 0); /* ??? */
+		dsi_write(dsi, REG_DSI_ACTIVE_VSYNC,
+				DSI_ACTIVE_VSYNC_START(0) |
+				DSI_ACTIVE_VSYNC_END(mode->vsync_end -
+				mode->vsync_start));
+	}else{
 	/* command mode panel */
-	bpp = 3; /*DSI_CMD_DST_FORMAT_RGB888, TODO for RGB565*/
-	dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM1_CTRL,
+		DBG("DSI : COMMAND PANEL : Timings");
+		bpp = 3; /*DSI_CMD_DST_FORMAT_RGB888, TODO for RGB565*/
+
+		dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM1_CTRL,
 			DSI_COMMAND_MODE_MDP_STREAM1_CTRL(
 			mode->hdisplay * bpp  + 1) | DTYPE_DCS_LWRITE);
-	dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM0_CTRL,
+		dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM0_CTRL,
 			DSI_COMMAND_MODE_MDP_STREAM1_CTRL(
 			mode->hdisplay * bpp + 1) | DTYPE_DCS_LWRITE);
-	dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM0_TOTAL,
+		dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM0_TOTAL,
 			DSI_COMMAND_MODE_MDP_STREAM1_TOTAL(mode->vdisplay) |
 			mode->hdisplay);
-	dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM1_TOTAL,
+		dsi_write(dsi, REG_DSI_COMMAND_MODE_MDP_STREAM1_TOTAL,
 			DSI_COMMAND_MODE_MDP_STREAM1_TOTAL(mode->vdisplay) |
 			mode->hdisplay);
+	}
 }
 
 static const struct drm_bridge_funcs dsi_bridge_funcs = {

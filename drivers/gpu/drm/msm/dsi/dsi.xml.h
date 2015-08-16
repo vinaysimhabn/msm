@@ -55,6 +55,7 @@ enum dsi_dst_format {
 	DST_FORMAT_RGB666 = 1,
 	DST_FORMAT_RGB666_LOOSE = 2,
 	DST_FORMAT_RGB888 = 3,
+	CMD_DST_FORMAT_RGB888 = 8,
 };
 
 enum dsi_rgb_swap {
@@ -114,20 +115,21 @@ static inline uint32_t DSI_VID_CFG0_DST_FORMAT(enum dsi_dst_format val)
 {
 	return ((val) << DSI_VID_CFG0_DST_FORMAT__SHIFT) & DSI_VID_CFG0_DST_FORMAT__MASK;
 }
-#define DSI_CMD_CFG0_DST_FORMAT__MASK				0x000000f0
+#define DSI_CMD_CFG0_DST_FORMAT__MASK				0x0000000f
 static inline uint32_t DSI_CMD_CFG0_DST_FORMAT(enum dsi_dst_format val)
 {
 	return (val  & DSI_CMD_CFG0_DST_FORMAT__MASK);
 }
 #define DSI_CMD_CTRL__MASK					0x000000ff
+#define DSI_CMD_CTRL__SHIFT					8
 static inline uint32_t DSI_CMD_CTRL_MEM_CONTINUE(enum dsi_dst_format val)
 {
-	return (val  & DSI_CMD_CTRL__MASK);
+	return ((val  & DSI_CMD_CTRL__MASK)) << DSI_CMD_CTRL__SHIFT;
 }
-#define DSI_CMD_CTRL_MEM_START__SHIFT				8
+#define DSI_CMD_CTRL_MEM_START__MASK				0x000000ff
 static inline uint32_t DSI_CMD_CTRL_MEM_START(enum dsi_dst_format val)
 {
-	return ((val) << DSI_CMD_CTRL_MEM_START__SHIFT) & DSI_CMD_CTRL__MASK;
+	return (val & DSI_CMD_CTRL_MEM_START__MASK);
 }
 #define DSI_VID_CFG0_TRAFFIC_MODE__MASK				0x00000300
 #define DSI_VID_CFG0_TRAFFIC_MODE__SHIFT			8
@@ -146,17 +148,30 @@ static inline uint32_t DSI_VID_CFG0_TRAFFIC_MODE(enum dsi_traffic_mode val)
 #define DSI_VID_CFG1_R_SEL					0x00000010
 #define DSI_VID_CFG1_G_SEL					0x00000100
 #define DSI_VID_CFG1_B_SEL					0x00001000
-#define DSI_VID_CFG1_RGB_SWAP__MASK				0x00070000
-#define DSI_VID_CFG1_RGB_SWAP__SHIFT				16
+#define DSI_VID_CFG1_RGB_SWAP__MASK                             0x00070000
+#define DSI_VID_CFG1_RGB_SWAP__SHIFT                            16
 static inline uint32_t DSI_VID_CFG1_RGB_SWAP(enum dsi_rgb_swap val)
 {
-	return ((val) << DSI_VID_CFG1_RGB_SWAP__SHIFT) & DSI_VID_CFG1_RGB_SWAP__MASK;
+        return ((val) << DSI_VID_CFG1_RGB_SWAP__SHIFT) & DSI_VID_CFG1_RGB_SWAP__MASK;
 }
-#define DSI_VID_CFG1_INTERLEAVE_MAX__MASK			0x00f00000
-#define DSI_VID_CFG1_INTERLEAVE_MAX__SHIFT			20
+#define DSI_VID_CFG1_INTERLEAVE_MAX__MASK                       0x00f00000
+#define DSI_VID_CFG1_INTERLEAVE_MAX__SHIFT                      20
 static inline uint32_t DSI_VID_CFG1_INTERLEAVE_MAX(uint32_t val)
 {
-	return ((val) << DSI_VID_CFG1_INTERLEAVE_MAX__SHIFT) & DSI_VID_CFG1_INTERLEAVE_MAX__MASK;
+        return ((val) << DSI_VID_CFG1_INTERLEAVE_MAX__SHIFT) & DSI_VID_CFG1_INTERLEAVE_MAX__MASK;
+}
+
+#define DSI_CMD_CFG0_RGB_SWAP__MASK				0x00000007
+#define DSI_CMD_CFG0_RGB_SWAP__SHIFT				16
+static inline uint32_t DSI_CMD_CFG0_RGB_SWAP(enum dsi_rgb_swap val)
+{
+	return ((val & DSI_CMD_CFG0_RGB_SWAP__MASK) << DSI_CMD_CFG0_RGB_SWAP__SHIFT);
+}
+#define DSI_CMD_CFG0_INTERLEAVE_MAX__MASK			0x0000000f
+#define DSI_CMD_CFG0_INTERLEAVE_MAX__SHIFT			20
+static inline uint32_t DSI_CMD_CFG0_INTERLEAVE_MAX(uint32_t val)
+{
+	return ((val & DSI_CMD_CFG0_INTERLEAVE_MAX__MASK) << DSI_CMD_CFG0_INTERLEAVE_MAX__SHIFT);
 }
 
 #define REG_DSI_ACTIVE_H					0x00000020
@@ -193,8 +208,7 @@ static inline uint32_t DSI_ACTIVE_V_END(uint32_t val)
 #define DSI_COMMAND_MODE_MDP_STREAM1_CTRL__SHIFT		16
 static inline uint32_t DSI_COMMAND_MODE_MDP_STREAM1_CTRL(uint32_t val)
 {
-	return ((val) << DSI_COMMAND_MODE_MDP_STREAM1_CTRL__SHIFT) &
-		DSI_COMMAND_MODE_MDP_STREAM1_CTRL__MASK;
+	return ((val) << DSI_COMMAND_MODE_MDP_STREAM1_CTRL__SHIFT);
 }
 
 #define REG_DSI_COMMAND_MODE_MDP_STREAM1_TOTAL			0x00000058
@@ -203,21 +217,20 @@ static inline uint32_t DSI_COMMAND_MODE_MDP_STREAM1_CTRL(uint32_t val)
 #define DSI_COMMAND_MODE_MDP_STREAM1_TOTAL__SHIFT		16
 static inline uint32_t DSI_COMMAND_MODE_MDP_STREAM1_TOTAL(uint32_t val)
 {
-	return ((val) << DSI_COMMAND_MODE_MDP_STREAM1_TOTAL__SHIFT) &
-		DSI_COMMAND_MODE_MDP_STREAM1_TOTAL__MASK;
+	return ((val) << DSI_COMMAND_MODE_MDP_STREAM1_TOTAL__SHIFT);
 }
 #define REG_DSI_TOTAL						0x00000028
 #define DSI_TOTAL_H_TOTAL__MASK					0x00000fff
 #define DSI_TOTAL_H_TOTAL__SHIFT				0
 static inline uint32_t DSI_TOTAL_H_TOTAL(uint32_t val)
 {
-	return ((val) << DSI_TOTAL_H_TOTAL__SHIFT) & DSI_TOTAL_H_TOTAL__MASK;
+	return ((val) << DSI_TOTAL_H_TOTAL__SHIFT);
 }
 #define DSI_TOTAL_V_TOTAL__MASK					0x0fff0000
 #define DSI_TOTAL_V_TOTAL__SHIFT				16
 static inline uint32_t DSI_TOTAL_V_TOTAL(uint32_t val)
 {
-	return ((val) << DSI_TOTAL_V_TOTAL__SHIFT) & DSI_TOTAL_V_TOTAL__MASK;
+	return ((val) << DSI_TOTAL_V_TOTAL__SHIFT);
 }
 
 #define REG_DSI_ACTIVE_HSYNC					0x0000002c

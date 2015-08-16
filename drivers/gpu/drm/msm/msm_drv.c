@@ -51,7 +51,7 @@ int msm_register_mmu(struct drm_device *dev, struct msm_mmu *mmu)
 }
 
 #ifdef CONFIG_DRM_MSM_REGISTER_LOGGING
-static bool reglog = true; //false;
+static bool reglog = false;
 MODULE_PARM_DESC(reglog, "Enable register read/write logging");
 module_param(reglog, bool, 0600);
 #else

@@ -22,6 +22,7 @@
 
 /* TODO get rid of msm specifics.. */
 #include "dsi/dsi.xml.h"
+#include<drm/drm_mipi_dsi.h>
 
 /* This is something relatively generic that could be outside msm driver */
 
@@ -209,6 +210,17 @@ static inline int mipi_read(struct mipi_adapter *mipi,
 		mipi_write(mipi, (u8 *)__buf, sizeof(__buf));               \
 	})
 
+#define __mipi_swrite1(mipi, htype, last, vc, ack, payload) ({           \
+		u32 __buf[1];                                               \
+		__buf[0]  = DSI_HDR_VC(vc);                                 \
+		__buf[0] |= DSI_HDR_DTYPE(htype);                           \
+		if (ack)  __buf[0] |= DSI_HDR_BTA;                          \
+		if (last) __buf[0] |= DSI_HDR_LAST;                         \
+		__buf[0] |= DSI_HDR_DATA1(payload[0]);                      \
+		__buf[0] |= DSI_HDR_DATA2(payload[1]);                      \
+		mipi_write(mipi, (u8 *)__buf, sizeof(__buf));               \
+	})
+
 /* long-packet write: */
 #define mipi_lwrite(mipi, last, vc, payload) \
 	__mipi_lwrite(mipi, DTYPE_GEN_LWRITE, last, vc, payload)
@@ -216,6 +228,10 @@ static inline int mipi_read(struct mipi_adapter *mipi,
 /* GEN2_Write packet write: */
 #define mipi_gen_write(mipi, last, vc, payload) \
 	__mipi_gen_write(mipi, DTYPE_GEN_WRITE2, last, vc, payload)
+
+/* dsc short-packet write1: */
+#define mipi_dcs_swrite1(mipi, last, vc, ack, payload) \
+	__mipi_swrite1(mipi, DTYPE_DCS_WRITE1, last, vc, ack, payload)
 
 /* dsc short-packet write: */
 #define mipi_dcs_swrite(mipi, last, vc, ack, val) \

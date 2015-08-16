@@ -59,6 +59,8 @@ struct dsi {
 	/* the encoder we are hooked to (outside of dsi block) */
 	struct drm_encoder *encoder;
 
+	int te_gpio;//gpio_LCM_TE /* JDI te pin */
+
 	int irq;
 };
 

@@ -546,7 +546,7 @@ static struct drm_display_mode *panel_truly_mode(struct panel *panel)
 	mode->vsync_end = mode->vsync_start + vspw;
 	mode->vtotal = mode->vsync_end + vbp;
 
-	mode->flags = 0;
+	mode->flags = MIPI_DSI_MODE_VIDEO;
 
 	return mode;
 }
