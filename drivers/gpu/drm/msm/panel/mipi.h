@@ -225,6 +225,10 @@ static inline int mipi_read(struct mipi_adapter *mipi,
 #define mipi_lwrite(mipi, last, vc, payload) \
 	__mipi_lwrite(mipi, DTYPE_GEN_LWRITE, last, vc, payload)
 
+/* dcs long-packet write: */
+#define mipi_dcs_lwrite(mipi, last, vc, payload) \
+	__mipi_lwrite(mipi, DTYPE_DCS_LWRITE, last, vc, payload)
+
 /* GEN2_Write packet write: */
 #define mipi_gen_write(mipi, last, vc, payload) \
 	__mipi_gen_write(mipi, DTYPE_GEN_WRITE2, last, vc, payload)

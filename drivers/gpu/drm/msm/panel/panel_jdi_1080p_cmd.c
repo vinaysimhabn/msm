@@ -45,8 +45,8 @@ struct panel_jdi {
 };
 #define to_panel_jdi(x) container_of(x, struct panel_jdi, base)
 
-static char set_tear_off[2] = {0x35, 0x00};
-static char set_tear_on[2] = {0x34, 0x00};
+static char set_tear_off[2] = {0x34, 0x00};
+static char set_tear_on[2] = {0x35, 0x00};
 
 static char sw_reset[2] = {0x01, 0x00}; /* DTYPE_DCS_WRITE */
 static char enter_sleep[2] = {0x10, 0x00}; /* DTYPE_DCS_WRITE */
@@ -55,8 +55,12 @@ static char display_off[2] = {0x28, 0x00}; /* DTYPE_DCS_WRITE */
 static char display_on[2] = {0x29, 0x00}; /* DTYPE_DCS_WRITE */
 
 static char MCAP[2] = {0xB0, 0x00};
-static char interface_setting[6] = {0xB3, 0x04, 0x08, 0x00, 0x22, 0x00};
+static char MCAP2[2] = {0xB0, 0x03};
+static char interface_setting[2] = {0xb3, 0x6f};
+/*TODO : need to check the registers for interface setting for this panel*/
+//static char interface_setting[6] = {0xB3, 0x04, 0x08, 0x00, 0x22, 0x00};
 static char interface_ID_setting[2] = {0xB4, 0x0C};
+static char tear_scan_line[3] = {0x44, 0x03, 0x00};
 static char DSI_control[3] = {0xB6, 0x3A, 0xD3};
 static char set_pixel_format[2] = {0x3A, 0x77};
 static char set_column_addr[5] = {0x2A, 0x00, 0x00, 0x04, 0xAF};
@@ -67,7 +71,7 @@ static char LTPS_timing_setting[2] = {0xC6, 0x78};
 static char sequencer_timing_control[2] = {0xD6, 0x01};
 
 /* set brightness */
-static char write_display_brightness[] = {0x51, 0x00};
+static char write_display_brightness[] = {0x51, 0xff};
 /* enable LEDPWM pin output, turn on LEDPWM output, turn off pwm dimming */
 static char write_control_display[] = {0x53, 0x24};
 /* choose cabc mode, 0x00(-0%), 0x01(-15%), 0x02(-40%), 0x03(-54%),
@@ -83,8 +87,6 @@ static char backlight_control3[] = {0xBA, 0x07, 0x70, 0x81, 0x20, 0x45, 0xB4};
 static char backlight_control4[] = {0xCE, 0x7D, 0x40, 0x48, 0x56, 0x67, 0x78,
                 0x88, 0x98, 0xA7, 0xB5, 0xC3, 0xD1, 0xDE, 0xE9, 0xF2, 0xFA,
                 0xFF, 0x37, 0xF5, 0x0F, 0x0F, 0x42, 0x00};
-
-static char bl_value[2] = {0x51, 0x0};
 
 static void panel_jdi_destroy(struct panel *panel)
 {
@@ -214,8 +216,15 @@ static int panel_jdi_on(struct panel *panel)
 		return ret;
 
 	mipi_set_panel_config(mipi, &(struct mipi_panel_config){
-		.cmd_mode = true,
-		.interleave_max = true,
+		.cmd_mode = false,
+		.traffic_mode = NON_BURST_SYNCH_EVENT,
+                .bllp_power_stop = true,
+                .eof_bllp_power_stop = true,
+                .hsa_power_stop = false,
+                .hbp_power_stop = true,
+                .hfp_power_stop = true,
+                .pulse_mode_hsa_he = true,
+		.interleave_max = false,
 		.rgb_swap = SWAP_RGB,
 		.format = CMD_DST_FORMAT_RGB888,
 		.insert_dcs_cmd = true,
@@ -223,7 +232,7 @@ static int panel_jdi_on(struct panel *panel)
 		.wr_mem_start = 0x2c,
 		.dma_trigger = TRIGGER_SW,
 		.mdp_trigger = TRIGGER_NONE,
-		.te = true,
+		.te = false,
 		.dlane_swap = 0,
 		.t_clk_pre = 0x1c,
 		.t_clk_post = 0x04,
@@ -252,7 +261,7 @@ static int panel_jdi_on(struct panel *panel)
 	});
 
 	mipi_set_bus_config(mipi, &(struct mipi_bus_config){
-		.low_power = true,
+		.low_power = false,
 		.lanes = 0xf,
 	});
 
@@ -262,38 +271,42 @@ static int panel_jdi_on(struct panel *panel)
 	backlight_control4[18] = 0x04;
 	backlight_control4[19] = 0x00;
 
-	mipi_dcs_swrite1(mipi, true, 0, false, set_tear_on);
-        mdelay(5);
-	mipi->wait=5;
+	mipi->wait=10;
 	mipi_dcs_swrite(mipi, true, 0, false, sw_reset[0]);
 	mipi->wait=0;
+	mipi_dcs_swrite1(mipi, true, 0, false, set_pixel_format);
+	mipi_dcs_lwrite(mipi, true, 0, set_column_addr);
+	mipi->wait=120;
+	mipi_dcs_lwrite(mipi, true, 0, set_page_addr);
+	mipi->wait=5;
+	mipi_dcs_swrite1(mipi, true, 0, false, set_tear_on);
+	mipi->wait=0;
+	mipi_lwrite(mipi, true, 0, tear_scan_line);
+	mipi_dcs_swrite1(mipi, true, 0, false, write_display_brightness);
+	mipi_dcs_swrite1(mipi, true, 0, false, write_control_display);
+	mipi_dcs_swrite1(mipi, true, 0, false, write_cabc);
+	mipi->wait=120;
+        mipi_dcs_swrite(mipi, true, 0, false, exit_sleep[0]);
+	mipi->wait=10;
 	mipi_gen_write(mipi, true, 0, MCAP);
+	mipi->wait=10;
 	mipi_lwrite(mipi, true, 0, interface_setting);
+	mipi->wait=20;
+	mipi_lwrite(mipi, true, 0, backlight_control4);
+	mipi->wait=0;
+	mipi_gen_write(mipi, true, 0, MCAP2);
+	mipi->wait=16;
+        mipi_dcs_swrite(mipi, true, 0, false, display_on[0]);
+        mdelay(150);
+if(0){
 	mipi_lwrite(mipi, true, 0, interface_ID_setting);
 	mipi_lwrite(mipi, true, 0, DSI_control);
 	mipi_gen_write(mipi, true, 0, LTPS_timing_setting);
 	mipi_dcs_swrite1(mipi, true, 0, false, sequencer_timing_control);
-	mipi_dcs_swrite1(mipi, true, 0, false, write_display_brightness);
-	mipi_dcs_swrite1(mipi, true, 0, false, write_control_display);
-	mipi_dcs_swrite1(mipi, true, 0, false, write_cabc);
 	mipi_lwrite(mipi, true, 0, backlight_control1);
 	mipi_lwrite(mipi, true, 0, backlight_control2);
 	mipi_lwrite(mipi, true, 0, backlight_control3);
-	mipi_lwrite(mipi, true, 0, backlight_control4);
-	mipi_dcs_swrite1(mipi, true, 0, false, set_pixel_format);
-	mipi_dcs_swrite(mipi, true, 0, false, set_column_addr[0]);
-	mipi->wait=120;
-	mipi_dcs_swrite(mipi, true, 0, false, set_page_addr[0]);
-        mdelay(20);
-	mipi->wait=0;
-        mipi_dcs_swrite(mipi, true, 0, false, exit_sleep[0]);
-        mdelay(5);
-        mipi_dcs_swrite(mipi, true, 0, false, display_on[0]);
-        mdelay(5);
-	mipi_gen_write(mipi, true, 0, bl_value);
-        mdelay(5);
-	bl_value[1] = 0x60;//TODO: need to map with pwm - pm8921_gpio_26
-	mipi_gen_write(mipi, true, 0, bl_value);
+}
 
 	return 0;
 }
@@ -337,7 +350,7 @@ static struct drm_display_mode *panel_jdi_mode(struct panel *panel)
 
 	snprintf(mode->name, sizeof(mode->name), "1200x1920");
 
-	mode->clock = 1000000;
+	mode->clock = 155000;
 
 	hbp = 60;
 	hfp = 48;
@@ -356,7 +369,7 @@ static struct drm_display_mode *panel_jdi_mode(struct panel *panel)
 	mode->vsync_end = mode->vsync_start + vspw;
 	mode->vtotal = mode->vsync_end + vbp;
 
-	mode->flags = 0;
+	mode->flags = MIPI_DSI_MODE_VIDEO;
 
 	return mode;
 }
@@ -461,12 +474,12 @@ struct panel *panel_jdi_1080p_init(struct drm_device *dev,
 		dev_err(dev->dev, "failed to request gpio export mpp: %d\n", ret);
 		goto fail;
 	}
-	ret = gpio_direction_output(panel_jdi->gpio_LCM_XRES_SR2, 0);
-/*	ret = gpio_tlmm_config(
+//	ret = gpio_direction_output(panel_jdi->gpio_LCM_XRES_SR2, 0);
+	ret = gpio_tlmm_config(
 		GPIO_CFG(panel_jdi->gpio_LCM_XRES_SR2, 0,
 			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 			GPIO_CFG_ENABLE);
-*/	if (ret) {
+	if (ret) {
 		dev_err(dev->dev, "failed to request gpio direction output XRES: %d\n", ret);
 		goto fail;
 	}
