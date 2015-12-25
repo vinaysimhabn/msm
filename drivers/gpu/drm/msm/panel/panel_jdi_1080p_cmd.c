@@ -56,9 +56,10 @@ static char display_on[2] = {0x29, 0x00}; /* DTYPE_DCS_WRITE */
 
 static char MCAP[2] = {0xB0, 0x00};
 static char MCAP2[2] = {0xB0, 0x03};
-static char interface_setting[2] = {0xb3, 0x6f};
+//static char interface_setting[2] = {0xb3, 0x6f};
 /*TODO : need to check the registers for interface setting for this panel*/
 //static char interface_setting[6] = {0xB3, 0x04, 0x08, 0x00, 0x22, 0x00};
+static char interface_setting[6] = {0xB3, 0x26, 0x08, 0x00, 0x20, 0x00};
 static char interface_ID_setting[2] = {0xB4, 0x0C};
 static char tear_scan_line[3] = {0x44, 0x03, 0x00};
 static char DSI_control[3] = {0xB6, 0x3A, 0xD3};
@@ -218,15 +219,15 @@ static int panel_jdi_on(struct panel *panel)
 	mipi_set_panel_config(mipi, &(struct mipi_panel_config){
 		.cmd_mode = false,
 		.traffic_mode = NON_BURST_SYNCH_EVENT,
-                .bllp_power_stop = true,
-                .eof_bllp_power_stop = true,
-                .hsa_power_stop = false,
+                .bllp_power_stop = false,
+                .eof_bllp_power_stop = false,
+                .hsa_power_stop = true,
                 .hbp_power_stop = true,
                 .hfp_power_stop = true,
                 .pulse_mode_hsa_he = true,
 		.interleave_max = false,
 		.rgb_swap = SWAP_RGB,
-		.format = CMD_DST_FORMAT_RGB888,
+		.format = DST_FORMAT_RGB888,
 		.insert_dcs_cmd = true,
 		.wr_mem_continue = 0x3c,
 		.wr_mem_start = 0x2c,
@@ -295,7 +296,7 @@ static int panel_jdi_on(struct panel *panel)
 	mipi_lwrite(mipi, true, 0, backlight_control4);
 	mipi->wait=0;
 	mipi_gen_write(mipi, true, 0, MCAP2);
-	mipi->wait=16;
+	mipi->wait=20;
         mipi_dcs_swrite(mipi, true, 0, false, display_on[0]);
         mdelay(150);
 if(0){
