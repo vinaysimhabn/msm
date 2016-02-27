@@ -29,12 +29,6 @@
 
 	gpio-keys {
 		compatible = "gpio-keys";
-		power {
-			label = "Power";
-			gpios = <&tlmm_pinmux 26 GPIO_ACTIVE_LOW>;
-			linux,code = <KEY_POWER>;
-			gpio-key,wakeup;
-		};
 		volume_up {
 			label = "Volume Up";
 			gpios = <&pm8921_gpio 4 GPIO_ACTIVE_HIGH>;
@@ -186,6 +180,15 @@
 				 */
 				lvs7 {
 					bias-pull-down;
+				};
+			};
+		};
+
+		/* override default debounce for power-key */
+		qcom,ssbi@500000 {
+			pmic@0 {
+				pwrkey@1c {
+					debounce = <1>;
 				};
 			};
 		};
