@@ -791,8 +791,8 @@ static void dsi_ctrl_config(struct msm_dsi_host *msm_host, bool enable,
 		/* Always set low power stop mode for BLLP
 		 * to let command engine send packets
 		 */
-		data |= DSI_VID_CFG0_EOF_BLLP_POWER_STOP |
-			DSI_VID_CFG0_BLLP_POWER_STOP;
+//		data |= DSI_VID_CFG0_EOF_BLLP_POWER_STOP |
+//			DSI_VID_CFG0_BLLP_POWER_STOP;
 		data |= DSI_VID_CFG0_TRAFFIC_MODE(dsi_get_traffic_mode(flags));
 		data |= DSI_VID_CFG0_DST_FORMAT(dsi_get_vid_fmt(mipi_fmt));
 		data |= DSI_VID_CFG0_VIRT_CHANNEL(msm_host->channel);
