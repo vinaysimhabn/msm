@@ -1,9 +1,13 @@
 /*
- * Copyright (C) 2015 InforceComputing
+ * Copyright (C) 2016 InforceComputing
  * Author: Vinay Simha BN <simhavcs@gmail.com>
  *
- * Copyright (C) 2015 Linaro Ltd
+ * Copyright (C) 2016 Linaro Ltd
  * Author: Sumit Semwal <sumit.semwal@linaro.org>
+ *
+ * From internet archives, the panel for Nexus 7 2nd Gen, 2013 model is a
+ * JDI model LT070ME05000, and its data sheet is at:
+ * http://panelone.net/en/7-0-inch/JDI_LT070ME05000_7.0_inch-datasheet
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
@@ -18,7 +22,6 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <linux/backlight.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -31,27 +34,26 @@
 
 #include <video/mipi_display.h>
 
-/*
- * From internet archives, the panel for Nexus 7 2nd Gen, 2013 model is a
- * JDI model LT070ME05000, and its data sheet is at:
- *  http://panelone.net/en/7-0-inch/JDI_LT070ME05000_7.0_inch-datasheet
- */
+#define PANEL_DEV_REGULATOR_MAX   3
+#define PANEL_MAX_BRIGHTNESS	0xFF
+
+const char *regs[] = {
+	"power",
+	"vddp",
+	"dcdc_en"
+};
+
 struct jdi_panel {
 	struct drm_panel base;
 	struct mipi_dsi_device *dsi;
 
-	/* TODO: Add backilght support */
-	struct backlight_device *backlight;
-	struct regulator *supply;
+	struct regulator_bulk_data supplies[PANEL_DEV_REGULATOR_MAX];
+
 	struct gpio_desc *reset_gpio;
 	struct gpio_desc *enable_gpio;
 	struct gpio_desc *vcc_gpio;
-
-	struct regulator *backlit;
-	struct regulator *lvs7;
-	struct regulator *avdd;
-	struct regulator *iovdd;
 	struct gpio_desc *pwm_gpio;
+	struct backlight_device *backlight;
 
 	bool prepared;
 	bool enabled;
@@ -64,38 +66,6 @@ static inline struct jdi_panel *to_jdi_panel(struct drm_panel *panel)
 	return container_of(panel, struct jdi_panel, base);
 }
 
-static char MCAP[2] = {0xB0, 0x00};
-/* static char interface_setting[6] = {0xB3, 0x04, 0x08, 0x00, 0x22, 0x00}; */
-//static char interface_setting[] = {0xB3, 0x6F};//, 0xff, 0xff};
-static char interface_setting[6] = {0xB3, 0x26, 0x08, 0x00, 0x20, 0x00};
-
-static char interface_ID_setting[2] = {0xB4, 0x0C};
-static char DSI_control[3] = {0xB6, 0x3A, 0xD3};
-
-static char tear_scan_line[3] = {0x44, 0x03, 0x00};
-
-/* for fps control, set fps to 60.32Hz */
-static char LTPS_timing_setting[2] = {0xC6, 0x78};
-static char sequencer_timing_control[2] = {0xD6, 0x01};
-
-/* set brightness */
-static char write_display_brightness[] = {0x51, 0xFF};
-/* enable LEDPWM pin output, turn on LEDPWM output, turn off pwm dimming */
-static char write_control_display[] = {0x53, 0x24};
-/* choose cabc mode, 0x00(-0%), 0x01(-15%), 0x02(-40%), 0x03(-54%),
-    disable SRE(sunlight readability enhancement) */
-static char write_cabc[] = {0x55, 0x00};
-/* for cabc mode 0x1(-15%) */
-static char backlight_control1[] = {0xB8, 0x07, 0x87, 0x26, 0x18, 0x00, 0x32};
-/* for cabc mode 0x2(-40%) */
-static char backlight_control2[] = {0xB9, 0x07, 0x75, 0x61, 0x20, 0x16, 0x87};
-/* for cabc mode 0x3(-54%) */
-static char backlight_control3[] = {0xBA, 0x07, 0x70, 0x81, 0x20, 0x45, 0xB4};
-/* for pwm frequency and dimming control */
-static char backlight_control4[] = {0xCE, 0x7D, 0x40, 0x48, 0x56, 0x67, 0x78,
-		0x88, 0x98, 0xA7, 0xB5, 0xC3, 0xD1, 0xDE, 0xE9, 0xF2, 0xFA,
-		0xFF, 0x37, 0xF5, 0x0F, 0x0F, 0x42, 0x00};
-
 static int jdi_panel_init(struct jdi_panel *jdi)
 {
 	struct mipi_dsi_device *dsi = jdi->dsi;
@@ -107,7 +77,7 @@ static int jdi_panel_init(struct jdi_panel *jdi)
 	if (ret < 0)
 		return ret;
 
-	mdelay(10);
+	usleep_range(10000, 20000);
 
 	ret = mipi_dsi_dcs_set_pixel_format(dsi, 0x70);
 	if (ret < 0)
@@ -121,27 +91,28 @@ static int jdi_panel_init(struct jdi_panel *jdi)
 	if (ret < 0)
 		return ret;
 
-	ret = mipi_dsi_dcs_set_tear_on(dsi, MIPI_DSI_DCS_TEAR_MODE_VBLANK);
+	ret = mipi_dsi_dcs_set_tear_on(dsi,
+				       MIPI_DSI_DCS_TEAR_MODE_VBLANK);
 	if (ret < 0)
 		return ret;
-	mdelay(5);
+	usleep_range(5000, 10000);
 
-	ret = mipi_dsi_generic_write(dsi, tear_scan_line,
-					sizeof(tear_scan_line));
-	if (ret < 0)
-		return ret;
-
-	ret = mipi_dsi_dcs_write_buffer(dsi, write_display_brightness,
-					sizeof(write_display_brightness));
+	ret = mipi_dsi_set_tear_scanline(dsi, 0x03, 0x00);
 	if (ret < 0)
 		return ret;
 
-	ret = mipi_dsi_dcs_write_buffer(dsi, write_control_display,
-					sizeof(write_control_display));
+	ret = mipi_dsi_dcs_write(dsi, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
+				 (u8[]){ 0xFF }, 1);
 	if (ret < 0)
 		return ret;
 
-	ret = mipi_dsi_dcs_write_buffer(dsi, write_cabc, sizeof(write_cabc));
+	ret = mipi_dsi_dcs_write(dsi, MIPI_DCS_WRITE_CONTROL_DISPLAY,
+				 (u8[]){ 0x24 }, 1);
+	if (ret < 0)
+		return ret;
+
+	ret = mipi_dsi_dcs_write(dsi, MIPI_DCS_WRITE_POWER_SAVE,
+				 (u8[]){ 0x00 }, 1);
 	if (ret < 0)
 		return ret;
 
@@ -150,66 +121,21 @@ static int jdi_panel_init(struct jdi_panel *jdi)
 		return ret;
 	mdelay(120);
 
-	ret = mipi_dsi_generic_write(dsi, MCAP, sizeof(MCAP));
+	ret = mipi_dsi_generic_write(dsi, (u8[]){0xB0, 0x00}, 2);
 	if (ret < 0)
 		return ret;
 	mdelay(10);
 
-	ret = mipi_dsi_generic_write(dsi, interface_setting,
-					sizeof(interface_setting));
+	ret = mipi_dsi_generic_write(dsi, (u8[])
+				     {0xB3, 0x26, 0x08, 0x00, 0x20, 0x00}, 6);
 	if (ret < 0)
 		return ret;
 	mdelay(20);
 
-	backlight_control4[18] = 0x04;
-	backlight_control4[19] = 0x00;
-
-	ret = mipi_dsi_generic_write(dsi, backlight_control4,
-					sizeof(backlight_control4));
-	if (ret < 0)
-		return ret;
-	mdelay(20);
-
-	MCAP[1] = 0x03;
-	ret = mipi_dsi_generic_write(dsi, MCAP, sizeof(MCAP));
+	ret = mipi_dsi_generic_write(dsi, (u8[]){0xB0, 0x03}, 2);
 	if (ret < 0)
 		return ret;
 
-if(0) { /* probably should zap this, no? -jstultz */
-	ret = mipi_dsi_generic_write(dsi, interface_ID_setting,
-					sizeof(interface_ID_setting));
-	if (ret < 0)
-		return ret;
-
-	ret = mipi_dsi_generic_write(dsi, DSI_control, sizeof(DSI_control));
-	if (ret < 0)
-		return ret;
-
-	ret = mipi_dsi_generic_write(dsi, LTPS_timing_setting,
-					sizeof(LTPS_timing_setting));
-	if (ret < 0)
-		return ret;
-
-	ret = mipi_dsi_generic_write(dsi, sequencer_timing_control,
-					sizeof(sequencer_timing_control));
-	if (ret < 0)
-		return ret;
-
-	ret = mipi_dsi_generic_write(dsi, backlight_control1,
-					sizeof(backlight_control1));
-	if (ret < 0)
-		return ret;
-
-	ret = mipi_dsi_generic_write(dsi, backlight_control2,
-					sizeof(backlight_control2));
-	if (ret < 0)
-		return ret;
-
-	ret = mipi_dsi_generic_write(dsi, backlight_control3,
-					sizeof(backlight_control3));
-	if (ret < 0)
-		return ret;
-}
 	return 0;
 }
 
@@ -273,6 +199,9 @@ static int jdi_panel_disable(struct drm_panel *panel)
 static int jdi_panel_unprepare(struct drm_panel *panel)
 {
 	struct jdi_panel *jdi = to_jdi_panel(panel);
+	struct regulator_bulk_data *s = jdi->supplies;
+	int num = PANEL_DEV_REGULATOR_MAX;
+	struct device *dev = &jdi->dsi->dev;
 	int ret;
 
 	if (!jdi->prepared)
@@ -286,7 +215,11 @@ static int jdi_panel_unprepare(struct drm_panel *panel)
 		return ret;
 	}
 
-	regulator_disable(jdi->supply);
+	ret = regulator_bulk_disable(num, s);
+	if (ret < 0) {
+		dev_err(dev, "regulator disable failed, %d\n", ret);
+		return ret;
+	}
 
 	if (jdi->vcc_gpio)
 		gpiod_set_value(jdi->vcc_gpio, 0);
@@ -305,6 +238,9 @@ static int jdi_panel_unprepare(struct drm_panel *panel)
 static int jdi_panel_prepare(struct drm_panel *panel)
 {
 	struct jdi_panel *jdi = to_jdi_panel(panel);
+	struct regulator_bulk_data *s = jdi->supplies;
+	int num = PANEL_DEV_REGULATOR_MAX;
+	struct device *dev = &jdi->dsi->dev;
 	int ret;
 
 	if (jdi->prepared)
@@ -312,46 +248,32 @@ static int jdi_panel_prepare(struct drm_panel *panel)
 
 	DRM_DEBUG("prepare\n");
 
-	ret = regulator_enable(jdi->iovdd);
-	if (ret < 0)
+	ret = regulator_bulk_enable(num, s);
+	if (ret < 0) {
+		dev_err(dev, "regulator enable failed, %d\n", ret);
 		return ret;
-
-	ret = regulator_enable(jdi->avdd);
-	if (ret < 0)
-		return ret;
-
-	ret = regulator_enable(jdi->backlit);
-	if (ret < 0)
-		return ret;
-
-	ret = regulator_enable(jdi->lvs7);
-	if (ret < 0)
-		return ret;
-
-	ret = regulator_enable(jdi->supply);
-	if (ret < 0)
-		return ret;
+	}
 
 	msleep(20);
 
 	if (jdi->vcc_gpio) {
 		gpiod_set_value(jdi->vcc_gpio, 1);
-		msleep(10);
+		usleep_range(10, 20);
 	}
 
 	if (jdi->reset_gpio) {
 		gpiod_set_value(jdi->reset_gpio, 1);
-		msleep(10);
+		usleep_range(10, 20);
 	}
 
 	if (jdi->pwm_gpio) {
 		gpiod_set_value(jdi->pwm_gpio, 1);
-		msleep(10);
+		usleep_range(10, 20);
 	}
 
 	if (jdi->enable_gpio) {
 		gpiod_set_value(jdi->enable_gpio, 1);
-		msleep(10);
+		usleep_range(10, 20);
 	}
 
 	ret = jdi_panel_init(jdi);
@@ -371,7 +293,6 @@ static int jdi_panel_prepare(struct drm_panel *panel)
 	return 0;
 
 poweroff:
-	regulator_disable(jdi->supply);
 	if (jdi->reset_gpio)
 		gpiod_set_value(jdi->reset_gpio, 0);
 	if (jdi->enable_gpio)
@@ -402,7 +323,7 @@ static int jdi_panel_enable(struct drm_panel *panel)
 }
 
 static const struct drm_display_mode default_mode = {
-		.clock = 155000,
+		.clock = 155493,
 		.hdisplay = 1200,
 		.hsync_start = 1200 + 48,
 		.hsync_end = 1200 + 48 + 32,
@@ -418,12 +339,14 @@ static const struct drm_display_mode default_mode = {
 static int jdi_panel_get_modes(struct drm_panel *panel)
 {
 	struct drm_display_mode *mode;
+	struct jdi_panel *jdi = to_jdi_panel(panel);
+	struct device *dev = &jdi->dsi->dev;
 
 	mode = drm_mode_duplicate(panel->drm, &default_mode);
 	if (!mode) {
-		dev_err(panel->drm->dev, "failed to add mode %ux%ux@%u\n",
-				default_mode.hdisplay, default_mode.vdisplay,
-				default_mode.vrefresh);
+		dev_err(dev, "failed to add mode %ux%ux@%u\n",
+			default_mode.hdisplay, default_mode.vdisplay,
+			default_mode.vrefresh);
 		return -ENOMEM;
 	}
 
@@ -435,47 +358,37 @@ static int jdi_panel_get_modes(struct drm_panel *panel)
 }
 
 static const struct drm_panel_funcs jdi_panel_funcs = {
-		.disable = jdi_panel_disable,
-		.unprepare = jdi_panel_unprepare,
-		.prepare = jdi_panel_prepare,
-		.enable = jdi_panel_enable,
-		.get_modes = jdi_panel_get_modes,
+	.disable = jdi_panel_disable,
+	.unprepare = jdi_panel_unprepare,
+	.prepare = jdi_panel_prepare,
+	.enable = jdi_panel_enable,
+	.get_modes = jdi_panel_get_modes,
 };
 
 static const struct of_device_id jdi_of_match[] = {
-		{ .compatible = "jdi,lt070me05000", },
-		{ }
+	{ .compatible = "jdi,lt070me05000", },
+	{ }
 };
 MODULE_DEVICE_TABLE(of, jdi_of_match);
 
 static int jdi_panel_add(struct jdi_panel *jdi)
 {
-	struct device *dev= &jdi->dsi->dev;
-	int ret;
+	struct device *dev = &jdi->dsi->dev;
+	struct regulator_bulk_data *s = jdi->supplies;
+	int num = PANEL_DEV_REGULATOR_MAX;
+	int i, ret;
 
 	jdi->mode = &default_mode;
 
-	/* lvs5 */
-	jdi->supply = devm_regulator_get(dev, "power");
-	if (IS_ERR(jdi->supply))
-		return PTR_ERR(jdi->supply);
+	for (i = 0; i < num; i++)
+		s[i].supply = regs[i];
 
-	/* l17 */
-	jdi->backlit = devm_regulator_get(dev, "backlit");
-	if (IS_ERR(jdi->supply))
-		return PTR_ERR(jdi->supply);
-
-	jdi->lvs7 = devm_regulator_get(dev, "lvs7");
-	if (IS_ERR(jdi->lvs7))
-		return PTR_ERR(jdi->lvs7);
-
-	jdi->avdd = devm_regulator_get(dev, "avdd");
-	if (IS_ERR(jdi->avdd))
-		return PTR_ERR(jdi->avdd);
-
-	jdi->iovdd = devm_regulator_get(dev, "iovdd");
-	if (IS_ERR(jdi->iovdd))
-		return PTR_ERR(jdi->iovdd);
+	ret = devm_regulator_bulk_get(dev, num, s);
+	if (ret < 0) {
+		dev_err(dev, "%s: failed to init regulator, ret=%d\n",
+			__func__, ret);
+		return ret;
+	}
 
 	jdi->vcc_gpio = devm_gpiod_get(dev, "vcc", GPIOD_OUT_LOW);
 	if (IS_ERR(jdi->vcc_gpio)) {
@@ -513,17 +426,7 @@ static int jdi_panel_add(struct jdi_panel *jdi)
 		gpiod_direction_output(jdi->pwm_gpio, 0);
 	}
 
-	/* we don't have backlight right now, proceed further */
-#if 0
-	np = of_parse_phandle(dev->of_node, "backlight", 0);
-	if (np) {
-		jdi->backlight = of_find_backlight_by_node(np);
-		of_node_put(np);
-
-		if (!jdi->backlight)
-			return -EPROBE_DEFER;
-	}
-#endif
+	jdi->backlight = drm_panel_create_dsi_backlight(jdi->dsi);
 
 	drm_panel_init(&jdi->base);
 	jdi->base.funcs = &jdi_panel_funcs;
@@ -531,24 +434,15 @@ static int jdi_panel_add(struct jdi_panel *jdi)
 
 	ret = drm_panel_add(&jdi->base);
 	if (ret < 0)
-		goto put_backlight;
+		return ret;
 
 	return 0;
-
-	put_backlight:
-	if (jdi->backlight)
-		put_device(&jdi->backlight->dev);
-
-	return ret;
 }
 
 static void jdi_panel_del(struct jdi_panel *jdi)
 {
 	if (jdi->base.dev)
 		drm_panel_remove(&jdi->base);
-
-	if (jdi->backlight)
-		put_device(&jdi->backlight->dev);
 }
 
 static int jdi_panel_probe(struct mipi_dsi_device *dsi)
@@ -564,18 +458,16 @@ static int jdi_panel_probe(struct mipi_dsi_device *dsi)
 			MIPI_DSI_CLOCK_NON_CONTINUOUS;
 
 	jdi = devm_kzalloc(&dsi->dev, sizeof(*jdi), GFP_KERNEL);
-	if (!jdi) {
+	if (!jdi)
 		return -ENOMEM;
-	}
 
 	mipi_dsi_set_drvdata(dsi, jdi);
 
 	jdi->dsi = dsi;
 
 	ret = jdi_panel_add(jdi);
-	if (ret < 0) {
+	if (ret < 0)
 		return ret;
-	}
 
 	return mipi_dsi_attach(dsi);
 }
@@ -620,5 +512,5 @@ module_mipi_dsi_driver(jdi_panel_driver);
 
 MODULE_AUTHOR("Sumit Semwal <sumit.semwal@linaro.org>");
 MODULE_AUTHOR("Vinay Simha BN <simhavcs@gmail.com>");
-MODULE_DESCRIPTION("JDI WUXGA LT070ME05000 DSI command mode panel driver");
+MODULE_DESCRIPTION("JDI WUXGA LT070ME05000 DSI video mode panel driver");
 MODULE_LICENSE("GPL v2");

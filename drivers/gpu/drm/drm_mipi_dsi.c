@@ -983,6 +983,28 @@ int mipi_dsi_dcs_set_tear_on(struct mipi_dsi_device *dsi,
 EXPORT_SYMBOL(mipi_dsi_dcs_set_tear_on);
 
 /**
+ * mipi_dsi_dcs_set_tear_scanline() - turn on the display module's Tearing Effect
+ *    output signal on the TE signal line when display module reaches line N
+ *    defined by STS[n:0].
+ * @dsi: DSI peripheral device
+ * @param1: STS[10:8]
+ * @param2: STS[7:0]
+ * Return: 0 on success or a negative error code on failure
+ */
+int mipi_dsi_set_tear_scanline(struct mipi_dsi_device *dsi,
+                             u8 param1, u8 param2)
+{
+        u8 payload[3] = { MIPI_DCS_SET_TEAR_SCANLINE, param1 , param2};
+        ssize_t err;
+
+        err = mipi_dsi_generic_write(dsi, &payload, sizeof(payload));
+        if (err < 0)
+                return err;
+
+        return 0;
+}
+EXPORT_SYMBOL(mipi_dsi_dcs_set_tear_scanline);
+/**
  * mipi_dsi_dcs_set_pixel_format() - sets the pixel format for the RGB image
  *    data used by the interface
  * @dsi: DSI peripheral device
@@ -1002,6 +1024,54 @@ int mipi_dsi_dcs_set_pixel_format(struct mipi_dsi_device *dsi, u8 format)
 	return 0;
 }
 EXPORT_SYMBOL(mipi_dsi_dcs_set_pixel_format);
+
+static int dsi_bl_get_brightness(struct backlight_device *bl)
+{
+	struct mipi_dsi_device *dsi = bl_get_data(bl);
+	int ret;
+	u8 data;
+
+	ret = mipi_dsi_dcs_read(dsi, MIPI_DCS_GET_DISPLAY_BRIGHTNESS,
+				&data, 1);
+	if (ret < 0)
+		return ret;
+
+	return data;
+}
+
+static int dsi_bl_update_status(struct backlight_device *bl)
+{
+	struct mipi_dsi_device *dsi = bl_get_data(bl);
+	int ret;
+	u8 brightness = bl->props.brightness;
+
+	ret = mipi_dsi_dcs_write(dsi, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
+				 &brightness, 1);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static const struct backlight_ops dsi_bl_ops = {
+	.update_status = dsi_bl_update_status,
+	.get_brightness = dsi_bl_get_brightness,
+};
+
+struct backlight_device *drm_panel_create_dsi_backlight(struct mipi_dsi_device *dsi)
+{
+	struct device *dev = &dsi->dev;
+	struct backlight_properties props;
+
+	memset(&props, 0, sizeof(props));
+	props.type = BACKLIGHT_RAW;
+	props.brightness = 255;
+	props.max_brightness = 255;
+
+	return devm_backlight_device_register(dev, dev_name(dev), dev, dsi,
+					      &dsi_bl_ops, &props);
+}
+EXPORT_SYMBOL(drm_panel_create_dsi_backlight);
 
 static int mipi_dsi_drv_probe(struct device *dev)
 {
