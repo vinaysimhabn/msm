@@ -1031,10 +1031,14 @@ static int dsi_bl_get_brightness(struct backlight_device *bl)
 	int ret;
 	u8 data;
 
+	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
+
 	ret = mipi_dsi_dcs_read(dsi, MIPI_DCS_GET_DISPLAY_BRIGHTNESS,
 				&data, 1);
 	if (ret < 0)
 		return ret;
+
+	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
 
 	return data;
 }
@@ -1045,10 +1049,14 @@ static int dsi_bl_update_status(struct backlight_device *bl)
 	int ret;
 	u8 brightness = bl->props.brightness;
 
+	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
+
 	ret = mipi_dsi_dcs_write(dsi, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
 				 &brightness, 1);
 	if (ret < 0)
 		return ret;
+
+	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
 
 	return 0;
 }
