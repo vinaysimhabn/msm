@@ -27,6 +27,18 @@
 		regulator-boot-on;
 	};
 
+        vcc_1p8v: regulator-fixed@2 {
+                compatible = "regulator-fixed";
+                regulator-min-microvolt = <1800000>;
+                regulator-max-microvolt = <1800000>;
+                regulator-name = "vcc_1p8v";
+                regulator-type = "voltage";
+                startup-delay-us = <0>;
+                gpio = <&pm8921_gpio 23 GPIO_ACTIVE_HIGH>;
+                enable-active-high;
+                regulator-boot-on;
+        };
+
 	gpio-keys {
 		compatible = "gpio-keys";
 		power {
@@ -105,6 +117,7 @@
 				l2 {
 					regulator-min-microvolt = <1200000>;
 					regulator-max-microvolt = <1200000>;
+					regulator-always-on;
 				};
 
 				/* msm_otg-HSUSB_3p3 */
@@ -138,14 +151,16 @@
 				l11 {
 					regulator-min-microvolt = <3000000>;
 					regulator-max-microvolt = <3000000>;
-					bias-pull-down;
+					//bias-pull-down;
+					regulator-always-on;
 				};
 
 				/* pwm_power for backlight */
 				l17 {
 					regulator-min-microvolt = <3000000>;
 					regulator-max-microvolt = <3600000>;
-					bias-pull-down;
+					//bias-pull-down;
+					regulator-always-on;
 				};
 
 				/* camera, qdsp6 */
@@ -186,6 +201,7 @@
 				 */
 				lvs7 {
 					bias-pull-down;
+					regulator-always-on;
 				};
 			};
 		};
@@ -276,6 +292,85 @@
 				status = "okay";
 				vmmc-supply = <&pm8921_l5>;
 				vqmmc-supply = <&pm8921_s4>;
+			};
+		};
+
+		tlmm_pinmux: pinctrl@800000 {
+
+                        dsi_panel_pinctrl: dsi-panel-pinctrl {
+                                mux {
+                                        pins = "gpio54";
+                                        function = "gpio";
+                                        bias-pull-up;
+                                        drive-strength = <8>;
+                                };
+                        };
+                };
+
+		 qcom,mdss_dsi@4700000 {
+                        status = "okay";
+                        vdda-supply = <&pm8921_l2>;/*VDD_MIPI1 to 4*/
+                        vdd-supply = <&pm8921_l8>;
+                        vddio-supply = <&pm8921_lvs7>;
+                        avdd-supply = <&pm8921_l11>;
+                        vcss-supply = <&ext_3p3v>;
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+					endpoint {
+						remote-endpoint = <&mdp_dsi1_out>;
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+					endpoint {
+						remote-endpoint = <&jdi_in>;
+						data-lanes = <0 1 2 3>;
+					};
+				};
+			};
+
+                        panel: panel@0 {
+                                reg = <0>;
+                                compatible = "jdi,lt070me05000";
+
+                                pinctrl-names = "default";
+                                pinctrl-0 = <&dsi_panel_pinctrl>;
+
+                                vddp-supply = <&pm8921_l17>;
+                                dcdc_en-supply = <&pm8921_lvs7>;
+                                vcc-supply = <&vcc_1p8v>;
+
+                                reset-gpios = <&tlmm_pinmux 54 0>;
+                                enable-gpios = <&pm8921_gpio 36 GPIO_ACTIVE_HIGH>;
+
+				port {
+					jdi_in: endpoint {
+						remote-endpoint = <&dsi0_out>;
+					};
+				};
+			};
+                };
+
+		qcom,mdss_dsi_phy@4700200 {
+                        status = "okay";
+                        vddio-supply = <&pm8921_lvs7>;/*VDD_PLL2_1 to 7*/
+                };
+
+		mdp@5100000 {
+			status = "okay";
+
+			ports {
+				port@1 {
+					endpoint {
+						remote-endpoint = <&dsi0_in>;
+					};
+				};
 			};
 		};
 	};
