@@ -307,7 +307,7 @@
                         };
                 };
 
-		 qcom,mdss_dsi@4700000 {
+		dsi@4700000 {
                         status = "okay";
                         vdda-supply = <&pm8921_l2>;/*VDD_MIPI1 to 4*/
                         vdd-supply = <&pm8921_l8>;
@@ -357,7 +357,7 @@
 			};
                 };
 
-		qcom,mdss_dsi_phy@4700200 {
+		dsi-phy@4700200 {
                         status = "okay";
                         vddio-supply = <&pm8921_lvs7>;/*VDD_PLL2_1 to 7*/
                 };
