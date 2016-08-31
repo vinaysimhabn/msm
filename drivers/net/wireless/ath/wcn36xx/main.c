@@ -574,6 +574,9 @@ static void wcn36xx_hw_scan_worker(struct work_struct *work)
 	struct cfg80211_scan_request *req = wcn->scan_req;
 	u8 channels[WCN36XX_HAL_PNO_MAX_NETW_CHANNELS_EX];
 	int i;
+	struct cfg80211_scan_info info = {
+		.aborted = false,
+	};
 
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac80211 scan %d channels worker\n", req->n_channels);
 
@@ -595,7 +598,7 @@ static void wcn36xx_hw_scan_worker(struct work_struct *work)
 	}
 	wcn36xx_smd_finish_scan(wcn, HAL_SYS_MODE_SCAN);
 
-	ieee80211_scan_completed(wcn->hw, false);
+	ieee80211_scan_completed(wcn->hw, &info);
 
 	mutex_lock(&wcn->scan_lock);
 	wcn->scan_req = NULL;
