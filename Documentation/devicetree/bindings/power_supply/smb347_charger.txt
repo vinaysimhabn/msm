@@ -3,6 +3,7 @@ smb347_charger bindings
 
 [Required porperties]
 - compatible : "summit,smb347"
+	       "summit,smb345"
 - reg : Slave address for i2c interface
 # At least one of followings should be set
   - enable-usb-charging
