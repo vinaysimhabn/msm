@@ -325,6 +325,23 @@
 					reg = <0x55>;
 				};
 
+				smb345@6a {
+					compatible = "summit,smb345";
+					reg = <0x6a>;
+					status = "okay";
+					interrupt-parent = <&tlmm_pinmux>;
+					interrupts = <23 IRQ_TYPE_EDGE_BOTH>;
+
+					max-chg-curr = <1800000>;
+					usb-curr-limit = <450000>;
+
+					chip-temp-thershold = <110>;
+
+					enable-usb-charging;
+					enable-otg-charging;
+
+					enable-chg-ctrl = <0>;  /* SW (i2c interface) */
+				};
 			};
 		};
 
