@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/err.h>
 #include <linux/export.h>
@@ -458,6 +459,9 @@ static int rpm_clk_probe(struct platform_device *pdev)
 				     rcc);
 	if (ret)
 		goto err;
+
+	if (clk_prepare_enable(rcc->clks[RPM_DAYTONA_FABRIC_CLK]->hw.clk))
+		dev_err(&pdev->dev, "Error enabling Daytona");
 
 	return 0;
 err:
