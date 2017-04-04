@@ -1,6 +1,7 @@
 #include "qcom-apq8064-v2.0.dtsi"
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+#include <dt-bindings/pinctrl/qcom,pmic-mpp.h>
 
 / {
 	model = "Qualcomm APQ8064/IFC6410";
@@ -124,6 +125,13 @@
 					qcom,switch-mode-frequency = <3200000>;
 				};
 
+                               /* mipi_dsi.1-dsi1_pll_vdda */
+                                l2 {
+                                        regulator-min-microvolt = <1200000>;
+                                        regulator-max-microvolt = <1200000>;
+                                        regulator-always-on;
+                                };
+
 				l3 {
 					regulator-min-microvolt = <3050000>;
 					regulator-max-microvolt = <3300000>;
@@ -147,6 +155,19 @@
 					regulator-max-microvolt = <2950000>;
 					bias-pull-down;
 				};
+
+                                l8 {
+                                        regulator-min-microvolt = <2800000>;
+                                        regulator-max-microvolt = <2800000>;
+                                        bias-pull-down;
+                                };
+
+
+                                l16 {
+                                        regulator-min-microvolt = <2800000>;
+                                        regulator-max-microvolt = <2800000>;
+                                        regulator-always-on;
+                                };
 
 				l23 {
 					regulator-min-microvolt = <1700000>;
@@ -350,6 +371,25 @@
 			};
 		};
 
+                qcom,ssbi@c00000 {
+                        pmicintc2: pmic@1 {
+
+                                pm8821_mpps: mpps@50 {
+                                        pinctrl-names = "default";
+                                        pinctrl-0 = <&disp_rst>;
+
+                                        disp_rst:  disp-rst{
+                                                pios {
+                                                        pins = "mpp2";
+                                                        function = "digital";
+                                                        power-source = <PM8921_GPIO_S4>;
+                                                        drive-strength = <PM8821_MPP_VPH>;
+                                                };
+                                        };
+                                };
+                        };
+                };
+
 		amba {
 			/* eMMC */
 			sdcc1: sdcc@12400000 {
@@ -408,6 +448,13 @@
 			status = "okay";
 
 			ports {
+
+				port@1 {
+                                        mdp_dsi1_out: endpoint {
+                                                remote-endpoint = <&dsi0_in>;
+                                        };
+                                };
+
 				port@3 {
 					endpoint {
 						remote-endpoint = <&hdmi_in>;
@@ -415,5 +462,51 @@
 				};
 			};
 		};
+
+                dsi0: mdss_dsi@4700000 {
+                        status = "okay";
+                        vdda-supply = <&pm8921_l2>;/*VDD_MIPI1 to 4*/
+                        vdd-supply = <&pm8921_l8>;
+                        vddio-supply = <&pm8921_lvs7>;
+                        avdd-supply = <&pm8921_l11>;
+                        vcss-supply = <&ext_3p3v>;
+
+                        panel@0 {
+                                reg = <0>;
+                                compatible = "truly,otm8018b";
+
+                                avdd-supply = <&pm8921_l8>;
+				iovdd-supply = <&pm8921_s4>;
+
+                                reset-gpios = <&pm8821_mpps 2 GPIO_ACTIVE_HIGH>;
+                                bklt-pwm-gpios = <&tlmm_pinmux 80 GPIO_ACTIVE_HIGH>;
+
+                                port {
+                                        panel_in: endpoint {
+                                                remote-endpoint = <&dsi0_out>;
+                                        };
+                                };
+                        };
+
+                        ports {
+                                port@0 {
+                                        dsi0_in: endpoint {
+                                                remote-endpoint = <&mdp_dsi1_out>;
+                                        };
+                                };
+
+                                port@1 {
+                                        dsi0_out: endpoint {
+                                                remote-endpoint = <&panel_in>;
+                                                data-lanes = <0 1 2 3>;
+                                        };
+                                };
+                        };
+                };
+
+                dsi-phy@4700200 {
+                        status = "okay";
+                        vddio-supply = <&pm8921_lvs7>;/*VDD_PLL2_1 to 7*/
+                };
 	};
 };

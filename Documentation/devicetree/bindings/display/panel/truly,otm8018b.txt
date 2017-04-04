@@ -1,0 +1,34 @@
+TRULY model TDO-FWVGA0402G90001 480x854 4" DSI Panel
+
+Required properties:
+- compatible: should be "truly,otm8018b"
+- avdd-supply: phandle of the regulator that provides the supply voltage
+  AVDD power supply (2.8V)
+- iovdd-supply: phandle of the regulator that provides the supply voltage
+  IOVDD  power supply (1.8V)
+- reset-gpios: phandle of gpio for reset line
+  RESET, HIGH active
+- bklt-pwm-gpios: phandle of the gpio for power ic line
+  Power IC supply enable, High active
+
+Example:
+
+	dsi0: qcom,mdss_dsi@4700000 {
+		panel@0 {
+			reg = <0>;
+			compatible = "truly,otm8018b";
+
+			avdd-supply = <&pm8921_l8>;
+			iovdd-supply = <&pm8921_s4>;
+
+			reset-gpios = <&pm8821_mpps 2 GPIO_ACTIVE_HIGH>;
+			bklt-pwm-gpios = <&tlmm_pinmux 80 GPIO_ACTIVE_HIGH>;
+
+			port {
+				panel_in: endpoint {
+					remote-endpoint = <&dsi0_out>;
+				};
+			};
+		};
+
+	};
