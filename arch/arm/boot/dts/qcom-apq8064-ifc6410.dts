@@ -190,7 +190,8 @@
 				};
 
 				lvs7 {
-					bias-pull-down;
+				//	bias-pull-down;
+					regulator-boot-on;
 				};
 			};
 		};
@@ -215,7 +216,7 @@
 		gsbi3: gsbi@16200000 {
 			status = "okay";
 			qcom,mode = <GSBI_PROT_I2C>;
-			i2c@16280000 {
+			i2c3: i2c@16280000 {
 				status = "okay";
 			};
 		};
@@ -341,6 +342,26 @@
 		qcom,ssbi@500000 {
 			pmic@0 {
 				gpio@150 {
+					pwm_bl_gpios: pwm-bl-gpios {
+                                                pios {
+                                                        pins = "gpio26";
+                                                        bias-disable;
+                                                        function = "normal";
+                                                        qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
+                                                        power-source = <PM8921_GPIO_S4>;
+                                                };
+                                        };
+
+                                        disp_en_gpios: disp-en-gpios {
+                                                pios {
+                                                        pins = "gpio36";
+                                                        bias-disable;
+                                                        function = "normal";
+                                                        qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
+                                                        power-source = <PM8921_GPIO_S4>;
+                                                };
+                                        };
+
 					wlan_default_gpios: wlan-gpios {
 						pios {
 							pins = "gpio43";
@@ -447,18 +468,65 @@
 		mdp@5100000 {
 			status = "okay";
 
+			lvds-vccs-3p3v-supply = <&ext_3p3v>;
+                        lvds-pll-vdda-supply = <&pm8921_l2>;
+                        lvds-vdda-supply = <&pm8921_lvs7>;
+
 			ports {
 
+				port@0 {
+					mdp_lvds_out: endpoint {
+                                                remote-endpoint = <&lvds0_in>;
+                                        };
+                                };
+/*
 				port@1 {
                                         mdp_dsi1_out: endpoint {
                                                 remote-endpoint = <&dsi0_in>;
                                         };
                                 };
-
+*/
 				port@3 {
 					endpoint {
 						remote-endpoint = <&hdmi_in>;
 					};
+				};
+			};
+		};
+
+		panel_3p3v: panel_3p3v {
+                        compatible = "regulator-fixed";
+                        pinctrl-0 = <&disp_en_gpios>;
+                        pinctrl-names = "default";
+                        regulator-min-microvolt = <3300000>;
+                        regulator-max-microvolt = <3300000>;
+                        regulator-name = "panel_en_3p3v";
+                        regulator-type = "voltage";
+                        startup-delay-us = <0>;
+                        gpio = <&pm8921_gpio 36 GPIO_ACTIVE_HIGH>;
+                        enable-active-high;
+                        regulator-boot-on;
+                };
+
+		backlight: backlight{
+                        pinctrl-0 = <&pwm_bl_gpios>;
+                        pinctrl-names = "default";
+                        compatible = "gpio-backlight";
+                        gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
+                        default-on;
+                };
+
+		panel: auo,b101xtn01 {
+                        status = "okay";
+                        compatible = "auo,b101xtn01";
+
+                        ddc-i2c-bus = <&i2c3>;
+                        backlight = <&backlight>;
+                        power-supply = <&panel_3p3v>;
+
+			port {
+				lvds0_in: endpoint {
+					remote-endpoint = <&mdp_lvds_out>;
 				};
 			};
 		};

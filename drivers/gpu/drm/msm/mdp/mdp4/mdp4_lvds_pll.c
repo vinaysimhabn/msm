@@ -43,7 +43,7 @@ struct pll_rate {
 
 /* NOTE: keep sorted highest freq to lowest: */
 static const struct pll_rate freqtbl[] = {
-	{ 72000000, {
+	{ 76420000, {
 		{ 0x8f, REG_MDP4_LVDS_PHY_PLL_CTRL_1 },
 		{ 0x30, REG_MDP4_LVDS_PHY_PLL_CTRL_2 },
 		{ 0xc6, REG_MDP4_LVDS_PHY_PLL_CTRL_3 },

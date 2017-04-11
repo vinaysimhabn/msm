@@ -262,7 +262,7 @@ static int panel_simple_get_modes(struct drm_panel *panel)
 	}
 
 	/* add hard-coded panel modes */
-	num += panel_simple_get_fixed_modes(p);
+//	num += panel_simple_get_fixed_modes(p);
 
 	return num;
 }
