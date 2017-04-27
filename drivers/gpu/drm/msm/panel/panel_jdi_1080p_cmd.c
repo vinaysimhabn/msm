@@ -204,6 +204,58 @@ static int panel_jdi_power_off(struct panel *panel)
 	return 0;
 }
 
+static void dump_all(void)
+{
+        void __iomem *dsi;
+        void __iomem *mdp;
+        void __iomem *mdp_dsi;
+        int i;
+
+        dsi = ioremap(0x4700000, SZ_2K);
+        mdp = ioremap(0x5100000, SZ_2K);
+        mdp_dsi = ioremap(0x51e0000, SZ_512);
+
+        printk(KERN_ERR "DSI\n");
+        for (i = 0; i < 343; i++) {
+                printk(KERN_ERR "%x : %x", 0x4700000 + 4 * i,
+                        __raw_readl(dsi + 4 * i));
+        }
+#if 0
+        printk(KERN_ERR "MDP\n");
+        for (i = 0; i < 309; i++) {
+                printk(KERN_ERR "%x : %x\n", 0x5100000 + 4 * i,
+                        __raw_readl(mdp + 4 * i));
+        }
+#endif
+        printk(KERN_ERR "MDP DSI\n");
+        for (i = 0; i < 13; i++) {
+                printk(KERN_ERR "%x : %x\n", 0x51e0000 + 4 * i,
+                        __raw_readl(mdp_dsi + 4 * i));
+        }
+
+        iounmap(dsi);
+        iounmap(mdp_dsi);
+        iounmap(mdp);
+}
+
+static void dump_cc(void)
+{
+        void __iomem *cc_base = ioremap(0x4000000, SZ_4K);
+
+        printk("MMSS_DSI1_ESC_CC : %08x\n", readl(cc_base + 0x0CC));
+        printk("MMSS_DSI1_ESC_NS : %08x\n", readl(cc_base + 0x11C));
+        printk("MMSS_DSI1_BYTE_CC : %08x\n", readl(cc_base + 0x90));
+        printk("MMSS_DSI1_BYTE_NS : %08x\n", readl(cc_base + 0xB0));
+        printk("MMSS_DSI1_PIXEL_CC : %08x\n", readl(cc_base + 0x130));
+        printk("MMSS_DSI1_PIXEL_MD : %08x\n", readl(cc_base + 0x134));
+        printk("MMSS_DSI1_PIXEL_NS : %08x\n", readl(cc_base + 0x138));
+        printk("MMSS_DSI1_CC : %08x\n", readl(cc_base + 0x4c));
+        printk("MMSS_DSI1_MD : %08x\n", readl(cc_base + 0x50));
+        printk("MMSS_DSI1_NS : %08x\n", readl(cc_base + 0x54));
+
+        iounmap(cc_base);
+}
+
 static int panel_jdi_on(struct panel *panel)
 {
 	struct panel_jdi *panel_jdi = to_panel_jdi(panel);
@@ -308,6 +360,9 @@ if(0){
 	mipi_lwrite(mipi, true, 0, backlight_control2);
 	mipi_lwrite(mipi, true, 0, backlight_control3);
 }
+
+        dump_all();
+        dump_cc();
 
 	return 0;
 }
