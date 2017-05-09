@@ -251,6 +251,11 @@
 			avdd-supply = <&pm8921_l11>;
 			vcss-supply = <&ext_3p3v>;
 
+			pinctrl-0 = <&vsync_gpio>;
+			pinctrl-names = "default";
+
+			disp-te-gpio = <&tlmm_pinmux 0 GPIO_ACTIVE_LOW>;
+
 			panel@0 {
 				reg = <0>;
 				compatible = "jdi,lt070me05000";

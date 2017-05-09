@@ -54,6 +54,19 @@
 		};
 	};
 
+	vsync_gpio: vsync_gpio {
+		mux {
+			pins = "gpio0";
+			function = "vsync_gpio";
+		};
+
+		pinconf {
+			pins = "gpio0";
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+	};
+
 	i2c1_pins: i2c1 {
 		mux {
 			pins = "gpio20", "gpio21";

@@ -43,6 +43,7 @@ struct mdp4_kms {
 	struct clk *pclk;
 	struct clk *lut_clk;
 	struct clk *axi_clk;
+	struct clk *vsync_clk;
 	struct msm_gem_address_space *aspace;
 
 	struct mdp_irq error_handler;
@@ -219,6 +220,7 @@ struct drm_connector *mdp4_lvds_connector_init(struct drm_device *dev,
 
 #ifdef CONFIG_DRM_MSM_DSI
 struct drm_encoder *mdp4_dsi_encoder_init(struct drm_device *dev);
+struct drm_encoder *mdp4_dsi_cmd_encoder_init(struct drm_device *dev);
 #else
 static inline struct drm_encoder *mdp4_dsi_encoder_init(struct drm_device *dev)
 {

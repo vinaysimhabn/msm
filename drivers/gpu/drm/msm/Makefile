@@ -67,6 +67,7 @@ msm-$(CONFIG_DRM_MSM_HDMI_HDCP) += hdmi/hdmi_hdcp.o
 
 msm-$(CONFIG_DRM_MSM_DSI) += dsi/dsi.o \
 			mdp/mdp4/mdp4_dsi_encoder.o \
+			mdp/mdp4/mdp4_dsi_cmd_encoder.o \
 			dsi/dsi_cfg.o \
 			dsi/dsi_host.o \
 			dsi/dsi_manager.o \

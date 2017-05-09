@@ -1196,6 +1196,10 @@
 						<&dsi0_phy 0>,
 						<&dsi0_phy 1>,
 						<&dsi0_phy 1>;
+
+			pinctrl-names = "default";
+			pinctrl-0 = <&vsync_gpio>;
+
 			syscon-sfpb = <&mmss_sfpb>;
 			phys = <&dsi0_phy>;
 			ports {
@@ -1383,13 +1387,15 @@
 				 <&mmcc MDP_AXI_CLK>,
 				 <&mmcc MDP_LUT_CLK>,
 				 <&mmcc HDMI_TV_CLK>,
-				 <&mmcc MDP_TV_CLK>;
+				 <&mmcc MDP_TV_CLK>,
+				 <&mmcc MDP_VSYNC_CLK>;
 			clock-names = "core_clk",
 				      "iface_clk",
 				      "bus_clk",
 				      "lut_clk",
 				      "hdmi_clk",
-				      "tv_clk";
+				      "tv_clk",
+				      "vsync_clk";
 
 			iommus = <&mdp_port0 0
 				  &mdp_port0 2

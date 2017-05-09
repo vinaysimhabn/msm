@@ -15,6 +15,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//#define DSI_CMD
 
 #include "msm_drv.h"
 #include "msm_gem.h"
@@ -323,7 +324,11 @@ static int mdp4_modeset_init_intf(struct mdp4_kms *mdp4_kms,
 			break;
 
 		for (i = 0; i < MSM_DSI_ENCODER_NUM; i++) {
+#ifdef DSI_CMD
+			dsi_encs[i] = mdp4_dsi_cmd_encoder_init(dev);
+#else
 			dsi_encs[i] = mdp4_dsi_encoder_init(dev);
+#endif
 			if (IS_ERR(dsi_encs[i])) {
 				ret = PTR_ERR(dsi_encs[i]);
 				dev_err(dev->dev,
@@ -514,7 +519,14 @@ struct msm_kms *mdp4_kms_init(struct drm_device *dev)
 		ret = PTR_ERR(mdp4_kms->axi_clk);
 		goto fail;
 	}
-
+#ifdef DSI_CMD
+	mdp4_kms->vsync_clk = devm_clk_get(&pdev->dev, "vsync_clk");
+ 	if (IS_ERR(mdp4_kms->vsync_clk)) {
+ 		dev_err(dev->dev, "failed to get vsync_clk\n");
+ 		ret = PTR_ERR(mdp4_kms->vsync_clk);
+ 		goto fail;
+ 	}
+#endif
 	clk_set_rate(mdp4_kms->clk, config->max_clk);
 	clk_set_rate(mdp4_kms->lut_clk, config->max_clk);
 
