@@ -25,6 +25,7 @@ void __log_ioremap(void __iomem *base, u32 size, const char *name);
 
 void __log_add(u32 val, u32 addr, const char *func, u32 line, u32 op);
 
+#ifdef TEST 
 #undef __raw_writel
 #undef __raw_readl
 
@@ -40,6 +41,7 @@ void __log_add(u32 val, u32 addr, const char *func, u32 line, u32 op);
 	printk(KERN_ERR "IO:R %08x %08x (%s:%d)\n", (u32)(addr), _val, __FILE__, __LINE__); \
 	_val; \
 })
+#endif
 
 #include <linux/clk.h>
 
