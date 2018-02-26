@@ -30,6 +30,8 @@
 #include "debug.h"
 
 #define WLAN_NV_FILE               "wlan/prima/WCNSS_qcom_wlan_nv.bin"
+#define WLAN_MAC_ADDR_0		   "wlan/macaddr0"
+
 #define WCN36XX_AGGR_BUFFER_SIZE 64
 
 /* How many frames until we start a-mpdu TX session */

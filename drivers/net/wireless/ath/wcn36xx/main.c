@@ -1261,13 +1261,49 @@ put_mmio_node:
 	return ret;
 }
 
+static int wcn36xx_msm_get_hw_mac(struct wcn36xx *wcn, u8 *addr)
+{
+        const struct firmware *addr_file = NULL;
+        int status;
+        u8 tmp[18];
+        static const char *files = {WLAN_MAC_ADDR_0};
+
+        status = request_firmware(&addr_file, files, wcn->dev);
+
+	if(status) {
+		wcn36xx_err("Failed to load nv file %s: %d\n",
+                                      WLAN_MAC_ADDR_0, status);
+                        goto out;
+	}
+        else {
+                memset(tmp, 0, sizeof(tmp));
+                memcpy(tmp, addr_file->data, sizeof(tmp) - 1);
+                sscanf(tmp, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                       &addr[0],
+                       &addr[1],
+                       &addr[2],
+                       &addr[3],
+                       &addr[4],
+                       &addr[5]);
+
+                release_firmware(addr_file);
+        }
+
+        return 0;
+out:
+	return status;
+}
+
 static int wcn36xx_probe(struct platform_device *pdev)
 {
 	struct ieee80211_hw *hw;
 	struct wcn36xx *wcn;
 	void *wcnss;
 	int ret;
+	u8 addr[ETH_ALEN];
+/*
 	const u8 *addr;
+*/
 
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "platform probe\n");
 
@@ -1295,13 +1331,16 @@ static int wcn36xx_probe(struct platform_device *pdev)
 		ret = PTR_ERR(wcn->smd_channel);
 		goto out_wq;
 	}
-
+/*
 	addr = of_get_property(pdev->dev.of_node, "local-mac-address", &ret);
 	if (addr && ret != ETH_ALEN) {
+*/
+	if(wcn36xx_msm_get_hw_mac(wcn, addr)) {
 		wcn36xx_err("invalid local-mac-address\n");
 		ret = -EINVAL;
 		goto out_wq;
-	} else if (addr) {
+	/* } else if (addr) { */
+	} else {
 		wcn36xx_info("mac address: %pM\n", addr);
 		SET_IEEE80211_PERM_ADDR(wcn->hw, addr);
 	}
@@ -1370,3 +1409,4 @@ module_platform_driver(wcn36xx_driver);
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Eugene Krasnikov k.eugene.e@gmail.com");
 MODULE_FIRMWARE(WLAN_NV_FILE);
+MODULE_FIRMWARE(WLAN_MAC_ADDR_0);
