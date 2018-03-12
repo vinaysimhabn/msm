@@ -150,8 +150,8 @@
 			compatible = "gpio-leds";
 
 			led@1 {
-				label = "apq8016-sbc:green:user1";
-				gpios = <&msmgpio 21 GPIO_ACTIVE_HIGH>;
+				label = "apq8016-sbc:red:user1";
+				gpios = <&msmgpio 95 GPIO_ACTIVE_HIGH>;
 				linux,default-trigger = "heartbeat";
 				default-state = "off";
 			};
@@ -179,16 +179,16 @@
 			};
 
 			led@5 {
-				label = "apq8016-sbc:yellow:wlan";
+				label = "apq8016-sbc:red:wlan";
 				gpios = <&pm8916_mpps 2 GPIO_ACTIVE_HIGH>;
 				linux,default-trigger = "phy0tx";
 				default-state = "off";
 			};
 
 			led@6 {
-				label = "apq8016-sbc:blue:bt";
+				label = "apq8016-sbc:red:bt";
 				gpios = <&pm8916_mpps 3 GPIO_ACTIVE_HIGH>;
-				linux,default-trigger = "bt";
+				linux,default-trigger = "hci0-power";
 				default-state = "off";
 			};
 		};
