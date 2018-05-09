@@ -177,4 +177,16 @@ config DRM_PANEL_SITRONIX_ST7789V
 	  Say Y here if you want to enable support for the Sitronix
 	  ST7789V controller for 240x320 LCD panels
 
+config MSM_MIPI_DSI_TC358775_DSI2LVDS
+        tristate "Toshiba TC358775 MIPI DSI-to-LVDS bridge"
+        depends on OF
+        select DRM_MIPI_DSI
+        select VIDEOMODE_HELPERS
+        help
+          Support for Toshiba MIPI DSI-to-LVDS bridge.
+          The chip supports 1366x768 24-bit
+          using a single LVDS link
+          and up to WUXGA 1920x1200 18-bit
+          using a dual LVDS link.
+
 endmenu
