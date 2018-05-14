@@ -26,6 +26,18 @@
 		};
 	};
 
+        dsi_sw_sel_apq: dsi_sw_sel_apq {
+                pinmux {
+                        function = "gpio";
+                        pins = "gpio32";
+                };
+                pinconf {
+                        pins = "gpio32";
+                        drive-strength = <16>;
+                        output-high;
+                };
+        };
+
 	adv7533_int_active: adv533_int_active {
 		pinmux {
 			function = "gpio";

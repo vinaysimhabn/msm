@@ -228,6 +228,34 @@
 		/* On High speed expansion */
 			label = "HS-I2C2";
 			status = "okay";
+
+			tc_bridge: bridge@0f {
+                                status = "okay";
+
+                                compatible = "toshiba,tc358775";
+                                reg = <0x0f>;
+
+				adi,dsi-lanes = <4>;
+
+                                dsi-sw-select-gpio = <&msmgpio 32 GPIO_ACTIVE_HIGH>;
+                                stby-gpio = <&msmgpio 99 GPIO_ACTIVE_LOW>;
+                                reset-gpio = <&msmgpio 72 GPIO_ACTIVE_LOW>;
+
+                                pinctrl-names = "default";
+                                pinctrl-0 = <&dsi_sw_sel_apq>;
+
+                                ports {
+                                        #address-cells = <1>;
+                                        #size-cells = <0>;
+
+                                        port@0 {
+                                                reg = <0>;
+                                                d2l_in: endpoint {
+                                                        remote-endpoint = <&dsi0_out>;
+                                                };
+                                        };
+				};
+			};
 		};
 
 		i2c@78ba000 {
@@ -298,6 +326,13 @@
 				linux,default-trigger = "bt";
 				default-state = "off";
 			};
+
+			led@7 {
+                                label = "apq8016-sbc:white:backlight";
+                                gpios = <&pm8916_mpps 4 GPIO_ACTIVE_HIGH>;
+                                linux,default-trigger = "backlight";
+                                default-state = "on";
+                        };
 		};
 
 		sdhci@7824000 {
@@ -357,26 +392,10 @@
 				vdda-supply = <&pm8916_l2>;
 				vddio-supply = <&pm8916_l6>;
 
-				panel@0 {
-                                        reg = <0>;
-                                        compatible = "toshiba,tc358775";
-
-                                        stby-gpio = <&msmgpio 99 GPIO_ACTIVE_LOW>;
-                                        reset-gpio = <&msmgpio 72 GPIO_ACTIVE_LOW>;
-
-                                        i2c-bus = <&blsp_i2c4>;
-
-                                        port {
-                                                dsi2lvds_in: endpoint {
-                                                        remote-endpoint = <&dsi0_out>;
-                                                };
-                                        };
-                                };
-
 				ports {
 					port@1 {
 						endpoint {
-							remote-endpoint = <&dsi2lvds_in>;
+							remote-endpoint = <&d2l_in>;
 							data-lanes = <0 1 2 3>;
 						};
 					};
