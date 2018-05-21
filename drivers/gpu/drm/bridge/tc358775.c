@@ -324,8 +324,8 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, PPI_LANEENABLE, val | DSI_CLEN_BIT);
 	d2l_write(tc, DSI_LANEENABLE, val | DSI_CLEN_BIT);
 
-	regmap_update_bits(tc->regmap, PPI_STARTPPI, BIT(0), 1);
-	regmap_update_bits(tc->regmap, DSI_STARTDSI, BIT(0), 1);
+	d2l_write(tc, PPI_STARTPPI, 0x00000001);
+        d2l_write(tc, DSI_STARTDSI, 0x00000001);
 
 	bpc = 3;
 	/* RGB666 - BIT8(1'b0), Magic square RGB666 18bit ~RGB888 24-bit */
@@ -334,12 +334,13 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	else
 		regmap_update_bits(tc->regmap, VPCTRL, VPCTRL_MSF_BIT, 1);
 
+	d2l_write(tc, VPCTRL, 0x01500001);
 	d2l_write(tc, HTIM1, htime1);
 	d2l_write(tc, VTIM1, vtime1);
 	d2l_write(tc, HTIM2, htime2);
 	d2l_write(tc, VTIM2, vtime2);
 
-	regmap_update_bits(tc->regmap, VFUEN, VFUEN_BIT, 1);
+	d2l_write(tc, VFUEN, 0x00000001);
 	d2l_write(tc, SYSRST, 0x00000004);
 	d2l_write(tc, LVPHY0, 0x00040006); /* TODO for LVPHY1 , timing calculation */
 
@@ -353,14 +354,13 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, LVMX2023, 0x1B151413);
 	d2l_write(tc, LVMX2427, 0x061A1918);
 #endif
-	regmap_update_bits(tc->regmap, VFUEN, VFUEN_BIT, 1);
+	d2l_write(tc, VFUEN, 0x00000001);
 
 	val = DIVIDE_BY_3 << LVCFG_PCLKDIV_OFFSET ;
 	if (dual_link) {
 		val |= dual_link << LVCFG_LVDLINK_OFFSET;
 	}
 	val = LVCFG_PCLKSEL_BITS | LVCFG_LVEN_BIT;
-	//regmap_update_bits(tc->regmap, LVCFG, LVCFG_PCLKSEL_BITS, 0); /* DSI_CLK */
 	d2l_write(tc, LVCFG, 0x00000031);
 }
 
