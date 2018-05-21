@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * tc358775 DSI to LVDS bridge driver
  *
@@ -15,8 +16,8 @@
  * GNU General Public License for more details.
  */
 
-/* #define DEBUG */
-/* #define TC358775_DEBUG */
+#define DEBUG
+#define TC358775_DEBUG
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/gpio/consumer.h>
@@ -146,13 +147,25 @@
 #define DEBUG00         0x05A0  /* Debug */
 #define DEBUG01         0x05A4  /* LVDS Data */
 
+#define DSI_LANE_OFFSET 1
+#define DSI_NUM_LANES_BITS      (BIT(4) | BIT(3) | BIT(2) | BIT(1))
+#define DSI_CLEN_BIT		BIT(0)
+#define SYSRSTLCD_BIT		BIT(2)
+#define VFUEN_BIT		BIT(0)
+#define DIVIDE_BY_3 3 /* Divide down from DCLK to generate PCLK */
+#define LVCFG_PCLKDIV_OFFSET 4
+#define LVCFG_PCLKDIV_BITS	(BIT(7) | BIT(6) | BIT(5) | BIT(4))
+#define LVCFG_LVDLINK_OFFSET	1
+#define LVCFG_LVDLINK_BIT	BIT(1)
+#define LVCFG_LVEN_BIT		BIT(0)
+
 static const char * const regulator_names[] = {
 	"vdd",
 	"vddio"
 };
 
 struct tc_data {
-	struct i2c_client 	*i2c;
+	struct i2c_clienti	*i2c;
 
 	struct device		*dev;
 	struct regmap		*regmap;
@@ -164,7 +177,7 @@ struct tc_data {
 	enum drm_connector_status status;
 	struct device_node *host_node;
 	struct mipi_dsi_device *dsi;
-        u8 num_dsi_lanes;
+	u8 num_dsi_lanes;
 
 	struct regulator_bulk_data supplies[ARRAY_SIZE(regulator_names)];
 	struct gpio_desc	*reset_gpio;
@@ -174,17 +187,17 @@ struct tc_data {
 
 static inline struct tc_data *bridge_to_tc(struct drm_bridge *b)
 {
-        return container_of(b, struct tc_data, bridge);
+	return container_of(b, struct tc_data, bridge);
 }
 
 static inline struct tc_data *connector_to_tc(struct drm_connector *c)
 {
-        return container_of(c, struct tc_data, connector);
+	return container_of(c, struct tc_data, connector);
 }
 
 static void tc_bridge_pre_enable(struct drm_bridge *bridge)
 {
-        struct tc_data *tc = bridge_to_tc(bridge);
+	struct tc_data *tc = bridge_to_tc(bridge);
 	struct device *dev = &tc->dsi->dev;
 	int ret;
 	unsigned int i;
@@ -194,20 +207,19 @@ static void tc_bridge_pre_enable(struct drm_bridge *bridge)
 
 	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(tc->supplies),
 				      tc->supplies);
-	if (ret < 0) {
+	if (ret < 0)
 		dev_err(dev, "failed to init regulator, ret=%d\n", ret);
-	}
 
 	gpiod_set_value(tc->stby_gpio, 0);
-        mdelay(10);
+	mdelay(10);
 
-        gpiod_set_value(tc->reset_gpio, 0);
-        ndelay(50);
+	gpiod_set_value(tc->reset_gpio, 0);
+	ndelay(50);
 }
 
 static void tc_bridge_disable(struct drm_bridge *bridge)
 {
-        struct tc_data *tc = bridge_to_tc(bridge);
+	struct tc_data *tc = bridge_to_tc(bridge);
 	struct device *dev = &tc->dsi->dev;
 	int ret;
 
@@ -216,10 +228,10 @@ static void tc_bridge_disable(struct drm_bridge *bridge)
 		dev_err(dev, "regulator disable failed, %d\n", ret);
 
 	gpiod_set_value(tc->stby_gpio, 1);
-        mdelay(10);
+	mdelay(10);
 
-        gpiod_set_value(tc->reset_gpio, 1);
-        ndelay(50);
+	gpiod_set_value(tc->reset_gpio, 1);
+	ndelay(50);
 }
 
 static const struct drm_display_mode auo_b101xtn01_mode = {
@@ -239,60 +251,65 @@ static const struct drm_display_mode auo_b101xtn01_mode = {
 #ifdef TC358775_DEBUG
 static u32 d2l_read(struct tc_data *tc, u16 reg)
 {
-        int ret;
-        u32 data;
+	int ret;
+	u32 data;
 
-        ret = regmap_bulk_read(tc->regmap, reg, &data, 1);
-        if (ret)
-                return ret;
+	ret = regmap_bulk_read(tc->regmap, reg, &data, 1);
+	if (ret)
+		return ret;
 
-        pr_debug("d2l: I2C : reg:%04x value:%08x\n", reg, data);
+	pr_debug("d2l: I2C : reg:%04x value:%08x\n", reg, data);
 
-        return data;
+	return data;
 }
 #endif
 
 static int d2l_write(struct tc_data *tc, u16 reg, u32 data)
 {
-        int ret = 0;
+	int ret = 0;
 
-        ret = regmap_bulk_write(tc->regmap, reg, (u32[]) {data}, 1);
+	ret = regmap_bulk_write(tc->regmap, reg, (u32[]) {data}, 1);
 
+#ifdef TC358775_DEBUG
+	d2l_read(tc, reg);
+#endif
 	return ret;
 }
 
 static void tc_bridge_enable(struct drm_bridge *bridge)
 {
-        struct tc_data *tc = bridge_to_tc(bridge);
-        int ret;
-        u32 hbpr, hpw, htime1, hfpr, hsize, htime2;
-        u32 vbpr, vpw, vtime1, vfpr, vsize, vtime2;
+	struct tc_data *tc = bridge_to_tc(bridge);
+	int ret;
+	u32 hbpr, hpw, htime1, hfpr, hsize, htime2;
+	u32 vbpr, vpw, vtime1, vfpr, vsize, vtime2;
+	unsigned int val = 0, dual_link = 0;
 
-        hbpr = 0;
-        hpw  = auo_b101xtn01_mode.hsync_end - auo_b101xtn01_mode.hsync_start;
-        vbpr = 0;
-        vpw  = auo_b101xtn01_mode.vsync_end - auo_b101xtn01_mode.vsync_start;
+	hbpr = 0;
+	hpw  = auo_b101xtn01_mode.hsync_end - auo_b101xtn01_mode.hsync_start;
+	vbpr = 0;
+	vpw  = auo_b101xtn01_mode.vsync_end - auo_b101xtn01_mode.vsync_start;
 
-        htime1 = (hbpr << 16) + hpw;
-        vtime1 = (vbpr << 16) + vpw;
+	htime1 = (hbpr << 16) + hpw;
+	vtime1 = (vbpr << 16) + vpw;
 
-        hfpr = auo_b101xtn01_mode.hsync_start - auo_b101xtn01_mode.hdisplay;
-        hsize = auo_b101xtn01_mode.hdisplay;
-        vfpr = auo_b101xtn01_mode.vsync_start - auo_b101xtn01_mode.vdisplay;
-        vsize = auo_b101xtn01_mode.vdisplay;
+	hfpr = auo_b101xtn01_mode.hsync_start - auo_b101xtn01_mode.hdisplay;
+	hsize = auo_b101xtn01_mode.hdisplay;
+	vfpr = auo_b101xtn01_mode.vsync_start - auo_b101xtn01_mode.vdisplay;
+	vsize = auo_b101xtn01_mode.vdisplay;
 
-        htime2 = (hfpr << 16) + hsize;
-        vtime2 = (vfpr << 16) + vsize;
+	htime2 = (hfpr << 16) + hsize;
+	vtime2 = (vfpr << 16) + vsize;
 
 	ret = regmap_read(tc->regmap, IDREG, &tc->rev);
-        if (ret) {
-                dev_err(tc->dev, "can not read device ID: %d\n", ret);
-                return;
-        }
-        pr_debug("tc IDREG %04x Rev. %08x\n", IDREG, tc->rev);
+	if (ret) {
+		dev_err(tc->dev, "can not read device ID: %d\n", ret);
+		return;
+	}
+	pr_debug("tc IDREG %04x Rev. %08x\n", IDREG, tc->rev);
 
 	d2l_write(tc, SYSRST, 0x000000FF);
 	mdelay(30);
+	d2l_read(tc, SYSRST);
 
 	d2l_write(tc, PPI_TX_RX_TA, 0x00040006);
 	d2l_write(tc, PPI_LPTXTIMECNT, 0x00000004);
@@ -300,21 +317,30 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, PPI_D1S_CLRSIPOCOUNT, 0x00000003);
 	d2l_write(tc, PPI_D2S_CLRSIPOCOUNT, 0x00000003);
 	d2l_write(tc, PPI_D3S_CLRSIPOCOUNT, 0x00000003);
-	d2l_write(tc, PPI_LANEENABLE, 0x0000001F);
-	d2l_write(tc, DSI_LANEENABLE, 0x0000001F);
-	d2l_write(tc, PPI_STARTPPI, 0x00000001);
-	d2l_write(tc, DSI_STARTDSI, 0x00000001);
 
-	/* RGB666 - BIT8(1'b0), Magic square RGB66 18bit ~RGB888 24-bit */
+	val = 0xF << DSI_LANE_OFFSET; /* LANES TODO */
+	regmap_update_bits(tc->regmap, PPI_LANEENABLE, DSI_NUM_LANES_BITS, val);
+	regmap_update_bits(tc->regmap, PPI_LANEENABLE, DSI_CLEN_BIT, 1);
+	d2l_read(tc, PPI_LANEENABLE);
+	regmap_update_bits(tc->regmap, DSI_LANEENABLE, DSI_NUM_LANES_BITS, val);
+	regmap_update_bits(tc->regmap, DSI_LANEENABLE, DSI_CLEN_BIT, 1);
+	d2l_read(tc, DSI_LANEENABLE);
+	regmap_update_bits(tc->regmap, PPI_STARTPPI, BIT(0), 1);
+	regmap_update_bits(tc->regmap, DSI_STARTDSI, BIT(0), 1);
+	d2l_read(tc, PPI_STARTPPI);
+	d2l_read(tc, DSI_STARTDSI);
+
+	/* RGB666 - BIT8(1'b0), Magic square RGB666 18bit ~RGB888 24-bit */
 	d2l_write(tc, VPCTRL, 0x01500001);
 	d2l_write(tc, HTIM1, htime1);
 	d2l_write(tc, VTIM1, vtime1);
 	d2l_write(tc, HTIM2, htime2);
 	d2l_write(tc, VTIM2, vtime2);
 
-	d2l_write(tc, VFUEN, 0x00000001);
-	d2l_write(tc, SYSRST, 0x00000004);
-
+	regmap_update_bits(tc->regmap, VFUEN, VFUEN_BIT, 1);
+	d2l_read(tc, VFUEN);
+	regmap_update_bits(tc->regmap, SYSRST, SYSRSTLCD_BIT, 1);
+	d2l_read(tc, SYSRST);
 	d2l_write(tc, LVPHY0, 0x00040006);
 
 #ifdef VESA_DATA_FORMAT
@@ -327,8 +353,22 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, LVMX2427, 0x061A1918);
 #endif
 	/*JEIDA DATA FORMAT default register values*/
-	d2l_write(tc, VFUEN, 0x00000001);
+	regmap_update_bits(tc->regmap, VFUEN, VFUEN_BIT, 1);
+	d2l_read(tc, VFUEN);
+
+	/* PCLKDIV 3 - divide by 3 [Divide by DCLK to generate PCLK]*/
+	/* LVDLINK [:1] (0)Single Link or (1)dual link LVDS transmitter */
+	/* LVEN [:0] LVDS transmitter enabled */
+
+	val = DIVIDE_BY_3 << LVCFG_PCLKDIV_OFFSET ; /* if dual LVDLINK_BIT */
+	regmap_update_bits(tc->regmap, LVCFG, LVCFG_PCLKDIV_BITS, val);
+	if (dual_link) {
+		val = dual_link << LVCFG_LVDLINK_OFFSET;
+		regmap_update_bits(tc->regmap, LVCFG, LVCFG_LVDLINK_BIT, val);
+	}
+	regmap_update_bits(tc->regmap, LVCFG, LVCFG_LVEN_BIT, 1);
 	d2l_write(tc, LVCFG, 0x00000031);
+	d2l_read(tc, LVCFG);
 }
 
 static int tc_connector_get_modes(struct drm_connector *connector)
@@ -336,145 +376,145 @@ static int tc_connector_get_modes(struct drm_connector *connector)
 
 	struct tc_data *tc = connector_to_tc(connector);
 	unsigned int count;
-       
+
 	struct drm_display_mode *mode;
 
-        mode = drm_mode_duplicate(tc->bridge.dev, &auo_b101xtn01_mode);
-        if (!mode) {
-                dev_err(tc->bridge.dev->dev, "failed to add mode %ux%ux@%u\n",
-                auo_b101xtn01_mode.hdisplay, auo_b101xtn01_mode.vdisplay,
-                        auo_b101xtn01_mode.vrefresh);
-                return -ENOMEM;
-        }
+	mode = drm_mode_duplicate(tc->bridge.dev, &auo_b101xtn01_mode);
+	if (!mode) {
+		dev_err(tc->bridge.dev->dev, "failed to add mode %ux%ux@%u\n",
+		auo_b101xtn01_mode.hdisplay, auo_b101xtn01_mode.vdisplay,
+			auo_b101xtn01_mode.vrefresh);
+		return -ENOMEM;
+	}
 
-        drm_mode_set_name(mode);
+	drm_mode_set_name(mode);
 
-        drm_mode_probed_add(connector, mode);
+	drm_mode_probed_add(connector, mode);
 
-        connector->display_info.width_mm = 64;
-        connector->display_info.height_mm = 114;
+	connector->display_info.width_mm = 64;
+	connector->display_info.height_mm = 114;
 
 	count = 1;
 
-        return count;
+	return count;
 }
 
 static int tc_connector_mode_valid(struct drm_connector *connector,
-                                   struct drm_display_mode *mode)
+					struct drm_display_mode *mode)
 {
-        /* Accept any mode */
-        return MODE_OK;
+	/* Accept any mode */
+	return MODE_OK;
 }
 
 static struct drm_encoder *
 tc_connector_best_encoder(struct drm_connector *connector)
 {
-        struct tc_data *tc = connector_to_tc(connector);
+	struct tc_data *tc = connector_to_tc(connector);
 
-        return tc->bridge.encoder;
+	return tc->bridge.encoder;
 }
 
 static const struct drm_connector_helper_funcs tc_connector_helper_funcs = {
-        .get_modes = tc_connector_get_modes,
-        .mode_valid = tc_connector_mode_valid,
-        .best_encoder = tc_connector_best_encoder,
+	.get_modes = tc_connector_get_modes,
+	.mode_valid = tc_connector_mode_valid,
+	.best_encoder = tc_connector_best_encoder,
 };
 
 static const struct drm_connector_funcs tc_connector_funcs = {
-        .fill_modes = drm_helper_probe_single_connector_modes,
-        .destroy = drm_connector_cleanup,
-        .reset = drm_atomic_helper_connector_reset,
-        .atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
-        .atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+	.fill_modes = drm_helper_probe_single_connector_modes,
+	.destroy = drm_connector_cleanup,
+	.reset = drm_atomic_helper_connector_reset,
+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
 int tc358775_parse_dt(struct device_node *np, struct tc_data *tc)
 {
-        u32 num_lanes;
+	u32 num_lanes;
 
-        of_property_read_u32(np, "adi,dsi-lanes", &num_lanes);
+	of_property_read_u32(np, "adi,dsi-lanes", &num_lanes);
 
-        if (num_lanes < 1 || num_lanes > 4)
-                return -EINVAL;
+	if (num_lanes < 1 || num_lanes > 4)
+		return -EINVAL;
 
-        tc->num_dsi_lanes = num_lanes;
+	tc->num_dsi_lanes = num_lanes;
 
-        tc->host_node = of_graph_get_remote_node(np, 0, 0);
-        if (!tc->host_node)
-                return -ENODEV;
+	tc->host_node = of_graph_get_remote_node(np, 0, 0);
+	if (!tc->host_node)
+		return -ENODEV;
 
-        of_node_put(tc->host_node);
+	of_node_put(tc->host_node);
 
-        return 0;
+	return 0;
 }
 
 int tc358775_attach_dsi(struct tc_data *tc)
 {
-        struct device *dev = &tc->i2c->dev;
-        struct mipi_dsi_host *host;
-        struct mipi_dsi_device *dsi;
-        int ret = 0;
-        const struct mipi_dsi_device_info info = { .type = "tc358775",
-                                                   .channel = 0,
-                                                   .node = NULL,
-                                                 };
+	struct device *dev = &tc->i2c->dev;
+	struct mipi_dsi_host *host;
+	struct mipi_dsi_device *dsi;
+	int ret = 0;
+	const struct mipi_dsi_device_info info = { .type = "tc358775",
+							.channel = 0,
+							.node = NULL,
+						};
 
-        host = of_find_mipi_dsi_host_by_node(tc->host_node);
-        if (!host) {
-                dev_err(dev, "failed to find dsi host\n");
-                return -EPROBE_DEFER;
-        }
+	host = of_find_mipi_dsi_host_by_node(tc->host_node);
+	if (!host) {
+		dev_err(dev, "failed to find dsi host\n");
+		return -EPROBE_DEFER;
+	}
 
-        dsi = mipi_dsi_device_register_full(host, &info);
-        if (IS_ERR(dsi)) {
-                dev_err(dev, "failed to create dsi device\n");
-                ret = PTR_ERR(dsi);
-                goto err_dsi_device;
-        }
+	dsi = mipi_dsi_device_register_full(host, &info);
+	if (IS_ERR(dsi)) {
+		dev_err(dev, "failed to create dsi device\n");
+		ret = PTR_ERR(dsi);
+		goto err_dsi_device;
+	}
 
-        tc->dsi = dsi;
+	tc->dsi = dsi;
 
-        dsi->lanes = tc->num_dsi_lanes;
-        dsi->format = MIPI_DSI_FMT_RGB888;
-        dsi->mode_flags = MIPI_DSI_MODE_VIDEO; 
+	dsi->lanes = tc->num_dsi_lanes;
+	dsi->format = MIPI_DSI_FMT_RGB888;
+	dsi->mode_flags = MIPI_DSI_MODE_VIDEO;
 
-        ret = mipi_dsi_attach(dsi);
-        if (ret < 0) {
-                dev_err(dev, "failed to attach dsi to host\n");
-                goto err_dsi_attach;
-        }
+	ret = mipi_dsi_attach(dsi);
+	if (ret < 0) {
+		dev_err(dev, "failed to attach dsi to host\n");
+		goto err_dsi_attach;
+	}
 
-        return 0;
+	return 0;
 
 err_dsi_attach:
-        mipi_dsi_device_unregister(dsi);
+	mipi_dsi_device_unregister(dsi);
 err_dsi_device:
-        return ret;
-} 
+	return ret;
+}
 
 static int tc_bridge_attach(struct drm_bridge *bridge)
 {
-        struct tc_data *tc = bridge_to_tc(bridge);
-        struct drm_device *drm = bridge->dev;
-        int ret;
+	struct tc_data *tc = bridge_to_tc(bridge);
+	struct drm_device *drm = bridge->dev;
+	int ret;
 
-        /* Create LVDS connector */
-        drm_connector_helper_add(&tc->connector, &tc_connector_helper_funcs);
-        ret = drm_connector_init(drm, &tc->connector, &tc_connector_funcs,
-                                 DRM_MODE_CONNECTOR_LVDS);
-        if (ret)
-                return ret;
+	/* Create LVDS connector */
+	drm_connector_helper_add(&tc->connector, &tc_connector_helper_funcs);
+	ret = drm_connector_init(drm, &tc->connector, &tc_connector_funcs,
+					DRM_MODE_CONNECTOR_LVDS);
+	if (ret)
+		return ret;
 
-        drm_mode_connector_attach_encoder(&tc->connector, tc->bridge.encoder);
+	drm_mode_connector_attach_encoder(&tc->connector, tc->bridge.encoder);
 
 	ret = tc358775_attach_dsi(tc);
 
-        return 0;
+	return 0;
 }
 
 static const struct drm_bridge_funcs tc_bridge_funcs = {
 	.attach = tc_bridge_attach,
-	.pre_enable = tc_bridge_pre_enable, 
+	.pre_enable = tc_bridge_pre_enable,
 	.enable = tc_bridge_enable,
 	.disable = tc_bridge_disable,
 };
@@ -495,7 +535,7 @@ static int tc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct device *dev = &client->dev;
 	struct tc_data *tc;
 	int ret;
-	
+
 	tc = devm_kzalloc(dev, sizeof(*tc), GFP_KERNEL);
 	if (!tc)
 		return -ENOMEM;
@@ -504,25 +544,25 @@ static int tc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	tc->i2c = client;
 	tc->status = connector_status_connected;
 
-	pr_debug("tc %s\n",__func__);
+	pr_debug("tc %s\n", __func__);
 
 	ret = tc358775_parse_dt(dev->of_node, tc);
 	if (ret)
 		return ret;
 
-        tc->stby_gpio = devm_gpiod_get(dev, "stby", GPIOD_OUT_HIGH);
-        if (IS_ERR(tc->stby_gpio)) {
-                ret = PTR_ERR(tc->stby_gpio);
-                dev_err(dev, "cannot get stby-gpio %d\n", ret);
-                return ret;
-        }
+	tc->stby_gpio = devm_gpiod_get(dev, "stby", GPIOD_OUT_HIGH);
+	if (IS_ERR(tc->stby_gpio)) {
+		ret = PTR_ERR(tc->stby_gpio);
+		dev_err(dev, "cannot get stby-gpio %d\n", ret);
+		return ret;
+	}
 
-        tc->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
-        if (IS_ERR(tc->reset_gpio)) {
-                ret = PTR_ERR(tc->reset_gpio);
-                dev_err(dev, "cannot get reset-gpios %d\n", ret);
-                return ret;
-        }
+	tc->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(tc->reset_gpio)) {
+		ret = PTR_ERR(tc->reset_gpio);
+		dev_err(dev, "cannot get reset-gpios %d\n", ret);
+		return ret;
+	}
 
 	tc->regmap = devm_regmap_init_i2c(client, &tc_regmap_config);
 	if (IS_ERR(tc->regmap)) {
