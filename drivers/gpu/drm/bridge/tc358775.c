@@ -17,7 +17,7 @@
  */
 
 #define DEBUG
-#define TC358775_DEBUG
+//#define TC358775_DEBUG
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/gpio/consumer.h>
@@ -147,17 +147,19 @@
 #define DEBUG00         0x05A0  /* Debug */
 #define DEBUG01         0x05A4  /* LVDS Data */
 
-#define DSI_LANE_OFFSET 1
+#define DSI_LANE_OFFSET		1
 #define DSI_NUM_LANES_BITS      (BIT(4) | BIT(3) | BIT(2) | BIT(1))
 #define DSI_CLEN_BIT		BIT(0)
 #define SYSRSTLCD_BIT		BIT(2)
 #define VFUEN_BIT		BIT(0)
-#define DIVIDE_BY_3 3 /* Divide down from DCLK to generate PCLK */
-#define LVCFG_PCLKDIV_OFFSET 4
+#define DIVIDE_BY_3		3 /* Divide down from DCLK to generate PCLK */
+#define LVCFG_PCLKDIV_OFFSET	4
 #define LVCFG_PCLKDIV_BITS	(BIT(7) | BIT(6) | BIT(5) | BIT(4))
 #define LVCFG_LVDLINK_OFFSET	1
 #define LVCFG_LVDLINK_BIT	BIT(1)
 #define LVCFG_LVEN_BIT		BIT(0)
+#define VPCTRL_OPXLFMT_BIT	BIT(8)
+#define VPCTRL_MSF_BIT		BIT(0)
 
 static const char * const regulator_names[] = {
 	"vdd",
@@ -165,7 +167,7 @@ static const char * const regulator_names[] = {
 };
 
 struct tc_data {
-	struct i2c_clienti	*i2c;
+	struct i2c_client	*i2c;
 
 	struct device		*dev;
 	struct regmap		*regmap;
@@ -282,7 +284,7 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	int ret;
 	u32 hbpr, hpw, htime1, hfpr, hsize, htime2;
 	u32 vbpr, vpw, vtime1, vfpr, vsize, vtime2;
-	unsigned int val = 0, dual_link = 0;
+	unsigned int val = 0, dual_link = 0, bpc = 0;
 
 	hbpr = 0;
 	hpw  = auo_b101xtn01_mode.hsync_end - auo_b101xtn01_mode.hsync_start;
@@ -309,7 +311,6 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 
 	d2l_write(tc, SYSRST, 0x000000FF);
 	mdelay(30);
-	d2l_read(tc, SYSRST);
 
 	d2l_write(tc, PPI_TX_RX_TA, 0x00040006);
 	d2l_write(tc, PPI_LPTXTIMECNT, 0x00000004);
@@ -321,26 +322,25 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	val = 0xF << DSI_LANE_OFFSET; /* LANES TODO */
 	regmap_update_bits(tc->regmap, PPI_LANEENABLE, DSI_NUM_LANES_BITS, val);
 	regmap_update_bits(tc->regmap, PPI_LANEENABLE, DSI_CLEN_BIT, 1);
-	d2l_read(tc, PPI_LANEENABLE);
 	regmap_update_bits(tc->regmap, DSI_LANEENABLE, DSI_NUM_LANES_BITS, val);
 	regmap_update_bits(tc->regmap, DSI_LANEENABLE, DSI_CLEN_BIT, 1);
-	d2l_read(tc, DSI_LANEENABLE);
 	regmap_update_bits(tc->regmap, PPI_STARTPPI, BIT(0), 1);
 	regmap_update_bits(tc->regmap, DSI_STARTDSI, BIT(0), 1);
-	d2l_read(tc, PPI_STARTPPI);
-	d2l_read(tc, DSI_STARTDSI);
 
+	bpc = 3;
 	/* RGB666 - BIT8(1'b0), Magic square RGB666 18bit ~RGB888 24-bit */
-	d2l_write(tc, VPCTRL, 0x01500001);
+	if (bpc == 4)
+		regmap_update_bits(tc->regmap, VPCTRL, VPCTRL_OPXLFMT_BIT, 1);
+	else
+		regmap_update_bits(tc->regmap, VPCTRL, VPCTRL_MSF_BIT, 1);
+
 	d2l_write(tc, HTIM1, htime1);
 	d2l_write(tc, VTIM1, vtime1);
 	d2l_write(tc, HTIM2, htime2);
 	d2l_write(tc, VTIM2, vtime2);
 
 	regmap_update_bits(tc->regmap, VFUEN, VFUEN_BIT, 1);
-	d2l_read(tc, VFUEN);
 	regmap_update_bits(tc->regmap, SYSRST, SYSRSTLCD_BIT, 1);
-	d2l_read(tc, SYSRST);
 	d2l_write(tc, LVPHY0, 0x00040006);
 
 #ifdef VESA_DATA_FORMAT
@@ -354,7 +354,6 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 #endif
 	/*JEIDA DATA FORMAT default register values*/
 	regmap_update_bits(tc->regmap, VFUEN, VFUEN_BIT, 1);
-	d2l_read(tc, VFUEN);
 
 	/* PCLKDIV 3 - divide by 3 [Divide by DCLK to generate PCLK]*/
 	/* LVDLINK [:1] (0)Single Link or (1)dual link LVDS transmitter */
@@ -368,7 +367,6 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	}
 	regmap_update_bits(tc->regmap, LVCFG, LVCFG_LVEN_BIT, 1);
 	d2l_write(tc, LVCFG, 0x00000031);
-	d2l_read(tc, LVCFG);
 }
 
 static int tc_connector_get_modes(struct drm_connector *connector)
