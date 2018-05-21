@@ -235,7 +235,7 @@
                                 compatible = "toshiba,tc358775";
                                 reg = <0x0f>;
 
-				adi,dsi-lanes = <4>;
+				tc,dsi-lanes = <4>;
 
                                 stby-gpio = <&msmgpio 99 GPIO_ACTIVE_LOW>;
                                 reset-gpio = <&msmgpio 72 GPIO_ACTIVE_LOW>;

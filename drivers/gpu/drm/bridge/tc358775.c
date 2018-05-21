@@ -16,8 +16,9 @@
  * GNU General Public License for more details.
  */
 
-#define DEBUG
-//#define TC358775_DEBUG
+/* #define DEBUG */
+/* #define TC358775_DEBUG */
+/* #define VESA_DATA_FORMAT */
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/gpio/consumer.h>
@@ -160,6 +161,7 @@
 #define LVCFG_LVEN_BIT		BIT(0)
 #define VPCTRL_OPXLFMT_BIT	BIT(8)
 #define VPCTRL_MSF_BIT		BIT(0)
+#define LVCFG_PCLKSEL_BITS	(BIT(11) | BIT(10))
 
 static const char * const regulator_names[] = {
 	"vdd",
@@ -343,6 +345,7 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	regmap_update_bits(tc->regmap, SYSRST, SYSRSTLCD_BIT, 1);
 	d2l_write(tc, LVPHY0, 0x00040006);
 
+	/*JEIDA DATA FORMAT default register values*/
 #ifdef VESA_DATA_FORMAT
 	d2l_write(tc, LVMX0003, 0x03020100);
 	d2l_write(tc, LVMX0407, 0x08050704);
@@ -352,21 +355,16 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, LVMX2023, 0x1B151413);
 	d2l_write(tc, LVMX2427, 0x061A1918);
 #endif
-	/*JEIDA DATA FORMAT default register values*/
 	regmap_update_bits(tc->regmap, VFUEN, VFUEN_BIT, 1);
 
-	/* PCLKDIV 3 - divide by 3 [Divide by DCLK to generate PCLK]*/
-	/* LVDLINK [:1] (0)Single Link or (1)dual link LVDS transmitter */
-	/* LVEN [:0] LVDS transmitter enabled */
-
-	val = DIVIDE_BY_3 << LVCFG_PCLKDIV_OFFSET ; /* if dual LVDLINK_BIT */
+	val = DIVIDE_BY_3 << LVCFG_PCLKDIV_OFFSET ;
 	regmap_update_bits(tc->regmap, LVCFG, LVCFG_PCLKDIV_BITS, val);
 	if (dual_link) {
 		val = dual_link << LVCFG_LVDLINK_OFFSET;
 		regmap_update_bits(tc->regmap, LVCFG, LVCFG_LVDLINK_BIT, val);
 	}
+	regmap_update_bits(tc->regmap, LVCFG, LVCFG_PCLKSEL_BITS, 0); /* DSI_CLK */
 	regmap_update_bits(tc->regmap, LVCFG, LVCFG_LVEN_BIT, 1);
-	d2l_write(tc, LVCFG, 0x00000031);
 }
 
 static int tc_connector_get_modes(struct drm_connector *connector)
@@ -430,7 +428,7 @@ int tc358775_parse_dt(struct device_node *np, struct tc_data *tc)
 {
 	u32 num_lanes;
 
-	of_property_read_u32(np, "adi,dsi-lanes", &num_lanes);
+	of_property_read_u32(np, "tc,dsi-lanes", &num_lanes);
 
 	if (num_lanes < 1 || num_lanes > 4)
 		return -EINVAL;
@@ -612,4 +610,4 @@ module_i2c_driver(tc358775_driver);
 
 MODULE_AUTHOR("Vinay Simha BN <vinaysimha@inforcecomputing.com>");
 MODULE_DESCRIPTION("tc358775 LVDS encoder driver");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
