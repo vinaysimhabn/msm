@@ -148,18 +148,16 @@
 #define DEBUG00         0x05A0  /* Debug */
 #define DEBUG01         0x05A4  /* LVDS Data */
 
-#define DSI_LANE_OFFSET		1
 #define DSI_CLEN_BIT		BIT(0)
-#define SYSRSTLCD_BIT		BIT(2)
-#define VFUEN_BIT		BIT(0)
 #define DIVIDE_BY_3		3 /* Divide down from DCLK to generate PCLK, PCLK=DCLK/3 */
 #define LVCFG_PCLKDIV_OFFSET	4
 #define LVCFG_LVDLINK_OFFSET	1
-#define LVCFG_LVDLINK_BIT	BIT(1)
 #define LVCFG_LVEN_BIT		BIT(0)
-#define VPCTRL_OPXLFMT_BIT	BIT(8)
-#define VPCTRL_MSF_BIT		BIT(0)
-#define LVCFG_PCLKSEL_BITS	(BIT(11) | BIT(10))
+
+#define L0EN BIT(1)
+#define L1EN BIT(2)
+#define L2EN BIT(3)
+#define L3EN BIT(4)
 
 static const char * const regulator_names[] = {
 	"vdd",
@@ -320,21 +318,19 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, PPI_D2S_CLRSIPOCOUNT, 0x00000003);
 	d2l_write(tc, PPI_D3S_CLRSIPOCOUNT, 0x00000003);
 
-	val = 0xF << DSI_LANE_OFFSET; /* LANES TODO */
-	d2l_write(tc, PPI_LANEENABLE, val | DSI_CLEN_BIT);
-	d2l_write(tc, DSI_LANEENABLE, val | DSI_CLEN_BIT);
+	val = ((L0EN << tc->num_dsi_lanes) - L0EN) | DSI_CLEN_BIT;
+	d2l_write(tc, PPI_LANEENABLE, val);
+	d2l_write(tc, DSI_LANEENABLE, val);
 
 	d2l_write(tc, PPI_STARTPPI, 0x00000001);
         d2l_write(tc, DSI_STARTDSI, 0x00000001);
 
 	bpc = 3;
-	/* RGB666 - BIT8(1'b0), Magic square RGB666 18bit ~RGB888 24-bit */
 	if (bpc == 4)
-		regmap_update_bits(tc->regmap, VPCTRL, VPCTRL_OPXLFMT_BIT, 1);
+		d2l_write(tc, VPCTRL, 0x01500100); /* RGB888 */
 	else
-		regmap_update_bits(tc->regmap, VPCTRL, VPCTRL_MSF_BIT, 1);
+		d2l_write(tc, VPCTRL, 0x01500001); /* RGB666 */
 
-	d2l_write(tc, VPCTRL, 0x01500001);
 	d2l_write(tc, HTIM1, htime1);
 	d2l_write(tc, VTIM1, vtime1);
 	d2l_write(tc, HTIM2, htime2);
@@ -356,12 +352,10 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 #endif
 	d2l_write(tc, VFUEN, 0x00000001);
 
-	val = DIVIDE_BY_3 << LVCFG_PCLKDIV_OFFSET ;
-	if (dual_link) {
-		val |= dual_link << LVCFG_LVDLINK_OFFSET;
-	}
-	val = LVCFG_PCLKSEL_BITS | LVCFG_LVEN_BIT;
-	d2l_write(tc, LVCFG, 0x00000031);
+	val = (DIVIDE_BY_3 << LVCFG_PCLKDIV_OFFSET) | LVCFG_LVEN_BIT;
+	if (dual_link)
+		val |= (1 << LVCFG_LVDLINK_OFFSET);
+	d2l_write(tc, LVCFG, val);
 }
 
 static int tc_connector_get_modes(struct drm_connector *connector)
