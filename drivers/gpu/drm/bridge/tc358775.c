@@ -16,7 +16,7 @@
  * GNU General Public License for more details.
  */
 
-/* #define DEBUG */
+ #define DEBUG 
 /* #define TC358775_DEBUG */
 /* #define VESA_DATA_FORMAT */
 #include <linux/clk.h>
@@ -34,6 +34,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_of.h>
+#include <drm/drm_panel.h>
 
 /* Registers */
 
@@ -172,12 +173,12 @@ struct tc_data {
 
 	struct drm_bridge	bridge;
 	struct drm_connector	connector;
-	/* current mode */
-	struct drm_display_mode	*mode;
+
 	enum drm_connector_status status;
 	struct device_node *host_node;
 	struct mipi_dsi_device *dsi;
 	u8 num_dsi_lanes;
+	struct drm_panel	*panel;
 
 	struct regulator_bulk_data supplies[ARRAY_SIZE(regulator_names)];
 	struct gpio_desc	*reset_gpio;
@@ -234,20 +235,6 @@ static void tc_bridge_disable(struct drm_bridge *bridge)
 	usleep_range(10, 20);
 }
 
-static const struct drm_display_mode auo_b101xtn01_mode = {
-	.clock = 72000,
-	.hdisplay = 1366,
-	.hsync_start = 1366 + 20,
-	.hsync_end = 1366 + 20 + 70,
-	.htotal = 1366 + 20 + 70,
-	.vdisplay = 768,
-	.vsync_start = 768 + 14,
-	.vsync_end = 768 + 14 + 42,
-	.vtotal = 768 + 14 + 42,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
-};
-
 #ifdef TC358775_DEBUG
 static u32 d2l_read(struct tc_data *tc, u16 reg)
 {
@@ -284,19 +271,20 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	u32 vbpr, vpw, vtime1, vfpr, vsize, vtime2;
 	unsigned int dual_link = 0, bpc = 0;
 	u32 val = 0;
+	struct drm_display_mode *mode = &bridge->encoder->crtc->state->adjusted_mode;
 
 	hbpr = 0;
-	hpw  = auo_b101xtn01_mode.hsync_end - auo_b101xtn01_mode.hsync_start;
+	hpw  = mode->hsync_end - mode->hsync_start;
 	vbpr = 0;
-	vpw  = auo_b101xtn01_mode.vsync_end - auo_b101xtn01_mode.vsync_start;
+	vpw  = mode->vsync_end - mode->vsync_start;
 
 	htime1 = (hbpr << 16) + hpw;
 	vtime1 = (vbpr << 16) + vpw;
 
-	hfpr = auo_b101xtn01_mode.hsync_start - auo_b101xtn01_mode.hdisplay;
-	hsize = auo_b101xtn01_mode.hdisplay;
-	vfpr = auo_b101xtn01_mode.vsync_start - auo_b101xtn01_mode.vdisplay;
-	vsize = auo_b101xtn01_mode.vdisplay;
+	hfpr = mode->hsync_start - mode->hdisplay;
+	hsize = mode->hdisplay;
+	vfpr = mode->vsync_start - mode->vdisplay;
+	vsize = mode->vdisplay;
 
 	htime2 = (hfpr << 16) + hsize;
 	vtime2 = (vfpr << 16) + vsize;
@@ -307,6 +295,8 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 		return;
 	}
 	pr_debug("tc IDREG %04x Rev. %08x\n", IDREG, tc->rev);
+
+	pr_debug("d2l tc bpc %d\n", tc->connector.display_info.bpc);
 
 	d2l_write(tc, SYSRST, 0x000000FF);
 	mdelay(30);
@@ -362,26 +352,22 @@ static int tc_connector_get_modes(struct drm_connector *connector)
 {
 
 	struct tc_data *tc = connector_to_tc(connector);
+	struct drm_panel *panel = tc->panel;
+	struct edid *edid;
 	unsigned int count;
 
-	struct drm_display_mode *mode;
-
-	mode = drm_mode_duplicate(tc->bridge.dev, &auo_b101xtn01_mode);
-	if (!mode) {
-		dev_err(tc->bridge.dev->dev, "failed to add mode %ux%ux@%u\n",
-		auo_b101xtn01_mode.hdisplay, auo_b101xtn01_mode.vdisplay,
-			auo_b101xtn01_mode.vrefresh);
-		return -ENOMEM;
+	if(panel) {
+		DRM_DEBUG_KMS("get mode from connected drm_panel\n");
+		return drm_panel_get_modes(panel);
 	}
 
-	drm_mode_set_name(mode);
+        edid = drm_get_edid(connector, tc->i2c->adapter);
+        if (!edid)
+                return 0;
 
-	drm_mode_probed_add(connector, mode);
-
-	connector->display_info.width_mm = 64;
-	connector->display_info.height_mm = 114;
-
-	count = 1;
+        drm_mode_connector_update_edid_property(connector, edid);
+        count = drm_add_edid_modes(connector, edid);
+	kfree(edid);
 
 	return count;
 }
