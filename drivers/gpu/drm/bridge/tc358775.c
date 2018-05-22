@@ -16,7 +16,7 @@
  * GNU General Public License for more details.
  */
 
- #define DEBUG 
+/* #define DEBUG */
 /* #define TC358775_DEBUG */
 /* #define VESA_DATA_FORMAT */
 #include <linux/clk.h>
@@ -150,7 +150,7 @@
 #define DEBUG01         0x05A4  /* LVDS Data */
 
 #define DSI_CLEN_BIT		BIT(0)
-#define DIVIDE_BY_3		3 /* Divide down from DCLK to generate PCLK, PCLK=DCLK/3 */
+#define DIVIDE_BY_3		3 /* PCLK=DCLK/3 */
 #define LVCFG_PCLKDIV_OFFSET	4
 #define LVCFG_LVDLINK_OFFSET	1
 #define LVCFG_LVEN_BIT		BIT(0)
@@ -173,12 +173,12 @@ struct tc_data {
 
 	struct drm_bridge	bridge;
 	struct drm_connector	connector;
+	struct drm_panel	*panel;
 
 	enum drm_connector_status status;
 	struct device_node *host_node;
 	struct mipi_dsi_device *dsi;
 	u8 num_dsi_lanes;
-	struct drm_panel	*panel;
 
 	struct regulator_bulk_data supplies[ARRAY_SIZE(regulator_names)];
 	struct gpio_desc	*reset_gpio;
@@ -216,6 +216,8 @@ static void tc_bridge_pre_enable(struct drm_bridge *bridge)
 
 	gpiod_set_value(tc->reset_gpio, 0);
 	usleep_range(10, 20);
+
+	drm_panel_prepare(tc->panel);
 }
 
 static void tc_bridge_disable(struct drm_bridge *bridge)
@@ -233,6 +235,15 @@ static void tc_bridge_disable(struct drm_bridge *bridge)
 
 	gpiod_set_value(tc->reset_gpio, 1);
 	usleep_range(10, 20);
+
+	drm_panel_disable(tc->panel);
+}
+
+static void tc_bridge_post_disable(struct drm_bridge *bridge)
+{
+	struct tc_data *tc = bridge_to_tc(bridge);
+
+	drm_panel_unprepare(tc->panel);
 }
 
 #ifdef TC358775_DEBUG
@@ -269,9 +280,11 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	int ret;
 	u32 hbpr, hpw, htime1, hfpr, hsize, htime2;
 	u32 vbpr, vpw, vtime1, vfpr, vsize, vtime2;
-	unsigned int dual_link = 0, bpc = 0;
+	unsigned int dual_link = 0;
 	u32 val = 0;
-	struct drm_display_mode *mode = &bridge->encoder->crtc->state->adjusted_mode;
+	struct drm_display_mode *mode;
+
+	mode = &bridge->encoder->crtc->state->adjusted_mode;
 
 	hbpr = 0;
 	hpw  = mode->hsync_end - mode->hsync_start;
@@ -296,8 +309,6 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	}
 	pr_debug("tc IDREG %04x Rev. %08x\n", IDREG, tc->rev);
 
-	pr_debug("d2l tc bpc %d\n", tc->connector.display_info.bpc);
-
 	d2l_write(tc, SYSRST, 0x000000FF);
 	mdelay(30);
 
@@ -313,10 +324,9 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, DSI_LANEENABLE, val);
 
 	d2l_write(tc, PPI_STARTPPI, 0x00000001);
-        d2l_write(tc, DSI_STARTDSI, 0x00000001);
+	d2l_write(tc, DSI_STARTDSI, 0x00000001);
 
-	bpc = 3;
-	if (bpc == 4)
+	if (tc->connector.display_info.bpc == 8) /* RGB888 */
 		d2l_write(tc, VPCTRL, 0x01500100); /* RGB888 */
 	else
 		d2l_write(tc, VPCTRL, 0x01500001); /* RGB666 */
@@ -328,7 +338,7 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 
 	d2l_write(tc, VFUEN, 0x00000001);
 	d2l_write(tc, SYSRST, 0x00000004);
-	d2l_write(tc, LVPHY0, 0x00040006); /* TODO for LVPHY1 , timing calculation */
+	d2l_write(tc, LVPHY0, 0x00040006); /* TODO timing calculation */
 
 	/*JEIDA DATA FORMAT default register values*/
 #ifdef VESA_DATA_FORMAT
@@ -346,27 +356,28 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	if (dual_link)
 		val |= (1 << LVCFG_LVDLINK_OFFSET);
 	d2l_write(tc, LVCFG, val);
+
+	drm_panel_enable(tc->panel);
 }
 
 static int tc_connector_get_modes(struct drm_connector *connector)
 {
-
 	struct tc_data *tc = connector_to_tc(connector);
-	struct drm_panel *panel = tc->panel;
 	struct edid *edid;
 	unsigned int count;
 
-	if(panel) {
-		DRM_DEBUG_KMS("get mode from connected drm_panel\n");
-		return drm_panel_get_modes(panel);
+	if (tc->panel && tc->panel->funcs && tc->panel->funcs->get_modes) {
+		count = tc->panel->funcs->get_modes(tc->panel);
+		if (count > 0)
+			return count;
 	}
 
-        edid = drm_get_edid(connector, tc->i2c->adapter);
-        if (!edid)
-                return 0;
+	edid = drm_get_edid(connector, tc->i2c->adapter);
+	if (!edid)
+		return 0;
 
-        drm_mode_connector_update_edid_property(connector, edid);
-        count = drm_add_edid_modes(connector, edid);
+	drm_mode_connector_update_edid_property(connector, edid);
+	count = drm_add_edid_modes(connector, edid);
 	kfree(edid);
 
 	return count;
@@ -478,6 +489,9 @@ static int tc_bridge_attach(struct drm_bridge *bridge)
 	if (ret)
 		return ret;
 
+	if (tc->panel)
+		drm_panel_attach(tc->panel, &tc->connector);
+
 	drm_mode_connector_attach_encoder(&tc->connector, tc->bridge.encoder);
 
 	ret = tc358775_attach_dsi(tc);
@@ -490,6 +504,7 @@ static const struct drm_bridge_funcs tc_bridge_funcs = {
 	.pre_enable = tc_bridge_pre_enable,
 	.enable = tc_bridge_enable,
 	.disable = tc_bridge_disable,
+	.post_disable = tc_bridge_post_disable,
 };
 
 static const struct regmap_config tc_regmap_config = {
@@ -517,7 +532,10 @@ static int tc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	tc->i2c = client;
 	tc->status = connector_status_connected;
 
-	pr_debug("tc %s\n", __func__);
+	/* port@1 is the output port */
+	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &tc->panel, NULL);
+	if (ret && ret != -ENODEV)
+		return ret;
 
 	ret = tc358775_parse_dt(dev->of_node, tc);
 	if (ret)
