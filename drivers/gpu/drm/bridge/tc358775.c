@@ -16,8 +16,8 @@
  * GNU General Public License for more details.
  */
 
- #define DEBUG
- #define TC358775_DEBUG
+/* #define DEBUG */
+/* #define TC358775_DEBUG */
 /* #define VESA_DATA_FORMAT */
 #include <linux/clk.h>
 #include <linux/device.h>
@@ -202,15 +202,13 @@ static void tc_bridge_pre_enable(struct drm_bridge *bridge)
 	struct tc_data *tc = bridge_to_tc(bridge);
 	struct device *dev = &tc->dsi->dev;
 	int ret;
-	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(tc->supplies); i++)
-		tc->supplies[i].supply = regulator_names[i];
-
-	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(tc->supplies),
-				      tc->supplies);
-	if (ret < 0)
-		dev_err(dev, "failed to init regulator, ret=%d\n", ret);
+	ret = regulator_bulk_enable(ARRAY_SIZE(tc->supplies), tc->supplies);
+	if (ret < 0) {
+		dev_err(dev, "regulator enable failed, %d\n", ret);
+		return;
+	}
+	mdelay(10);
 
 	gpiod_set_value(tc->stby_gpio, 0);
 	mdelay(10);
@@ -230,6 +228,7 @@ static void tc_bridge_disable(struct drm_bridge *bridge)
 	ret = regulator_bulk_disable(ARRAY_SIZE(tc->supplies), tc->supplies);
 	if (ret < 0)
 		dev_err(dev, "regulator disable failed, %d\n", ret);
+	mdelay(10);
 
 	gpiod_set_value(tc->stby_gpio, 1);
 	mdelay(10);
@@ -532,6 +531,7 @@ static int tc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct device *dev = &client->dev;
 	struct tc_data *tc;
 	int ret;
+	unsigned int i;
 
 	tc = devm_kzalloc(dev, sizeof(*tc), GFP_KERNEL);
 	if (!tc)
@@ -549,6 +549,14 @@ static int tc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	ret = tc358775_parse_dt(dev->of_node, tc);
 	if (ret)
 		return ret;
+
+	for (i = 0; i < ARRAY_SIZE(tc->supplies); i++)
+		tc->supplies[i].supply = regulator_names[i];
+
+	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(tc->supplies),
+				      tc->supplies);
+	if (ret < 0)
+		dev_err(dev, "failed to init regulator, ret=%d\n", ret);
 
 	tc->stby_gpio = devm_gpiod_get(dev, "stby", GPIOD_OUT_HIGH);
 	if (IS_ERR(tc->stby_gpio)) {
