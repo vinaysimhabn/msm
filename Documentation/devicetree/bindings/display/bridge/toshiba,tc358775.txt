@@ -15,7 +15,7 @@ Required nodes:
 The TC358775 has two ports. Their connections are modelled using the OF
 graph bindings specified in Documentation/devicetree/bindings/graph.txt.
 
-- Video port 0 for the LVDS input. The remote endpoint phandle should be a 
+- Video port 0 for the DSI input. The remote endpoint phandle should be a
 	reference to a valid mipi_dsi_host device node.
 - Video port 1 for the LVDS output.
 

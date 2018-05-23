@@ -261,9 +261,9 @@
 			};
 		};
 
-		panel: innolux,n116bge {
+		panel: auo,b101xtn01 {
 			status = "okay";
-			compatible = "innolux,n116bge";
+			compatible = "auo,b101xtn01";
 			power-supply = <&pm8916_l14>;
 
 			port {

@@ -16,8 +16,8 @@
  * GNU General Public License for more details.
  */
 
-/* #define DEBUG */
-/* #define TC358775_DEBUG */
+ #define DEBUG
+ #define TC358775_DEBUG
 /* #define VESA_DATA_FORMAT */
 #include <linux/clk.h>
 #include <linux/device.h>
@@ -212,10 +212,10 @@ static void tc_bridge_pre_enable(struct drm_bridge *bridge)
 		dev_err(dev, "failed to init regulator, ret=%d\n", ret);
 
 	gpiod_set_value(tc->stby_gpio, 0);
-	usleep_range(10000, 20000);
+	mdelay(10);
 
 	gpiod_set_value(tc->reset_gpio, 0);
-	usleep_range(10, 20);
+	ndelay(50);
 
 	drm_panel_prepare(tc->panel);
 }
@@ -231,10 +231,10 @@ static void tc_bridge_disable(struct drm_bridge *bridge)
 		dev_err(dev, "regulator disable failed, %d\n", ret);
 
 	gpiod_set_value(tc->stby_gpio, 1);
-	usleep_range(10000, 20000);
+	mdelay(10);
 
 	gpiod_set_value(tc->reset_gpio, 1);
-	usleep_range(10, 20);
+	ndelay(50);
 
 	drm_panel_disable(tc->panel);
 }
@@ -327,7 +327,7 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, DSI_STARTDSI, 0x00000001);
 
 	if (tc->connector.display_info.bpc == 8) /* RGB888 */
-		d2l_write(tc, VPCTRL, 0x01500100); /* RGB888 */
+		d2l_write(tc, VPCTRL, 0x01500100);
 	else
 		d2l_write(tc, VPCTRL, 0x01500001); /* RGB666 */
 
