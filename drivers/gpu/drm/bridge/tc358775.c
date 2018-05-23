@@ -184,6 +184,7 @@ struct tc_data {
 	struct gpio_desc	*reset_gpio;
 	struct gpio_desc	*stby_gpio;
 	u32                     rev;
+	u8			dual_link; /* single-link or dual-link */
 };
 
 static inline struct tc_data *bridge_to_tc(struct drm_bridge *b)
@@ -280,7 +281,6 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	int ret;
 	u32 hbpr, hpw, htime1, hfpr, hsize, htime2;
 	u32 vbpr, vpw, vtime1, vfpr, vsize, vtime2;
-	unsigned int dual_link = 0;
 	u32 val = 0;
 	struct drm_display_mode *mode;
 
@@ -301,6 +301,8 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 
 	htime2 = (hfpr << 16) + hsize;
 	vtime2 = (vfpr << 16) + vsize;
+
+	tc->dual_link = 0;
 
 	ret = regmap_read(tc->regmap, IDREG, &tc->rev);
 	if (ret) {
@@ -338,7 +340,7 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 
 	d2l_write(tc, VFUEN, 0x00000001);
 	d2l_write(tc, SYSRST, 0x00000004);
-	d2l_write(tc, LVPHY0, 0x00040006); /* TODO timing calculation */
+	d2l_write(tc, LVPHY0, 0x00040006);
 
 	/*JEIDA DATA FORMAT default register values*/
 #ifdef VESA_DATA_FORMAT
@@ -353,7 +355,7 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, VFUEN, 0x00000001);
 
 	val = (DIVIDE_BY_3 << LVCFG_PCLKDIV_OFFSET) | LVCFG_LVEN_BIT;
-	if (dual_link)
+	if (tc->dual_link == 1)
 		val |= (1 << LVCFG_LVDLINK_OFFSET);
 	d2l_write(tc, LVCFG, val);
 
@@ -386,7 +388,14 @@ static int tc_connector_get_modes(struct drm_connector *connector)
 static int tc_connector_mode_valid(struct drm_connector *connector,
 					struct drm_display_mode *mode)
 {
-	/* Accept any mode */
+	struct tc_data *tc = connector_to_tc(connector);
+
+	/*Maximum pixel clock speed of 135 MHz for single-link
+		or 270 MHz for dual-link */
+	 if ((mode->clock > 135000) & (tc->dual_link == 0) ||
+		((mode->clock > 270000) & (tc->dual_link == 1)))
+		return MODE_CLOCK_HIGH;
+
 	return MODE_OK;
 }
 
