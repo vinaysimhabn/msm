@@ -7,6 +7,8 @@ Required properties:
   be one of 1, 2, 3 or 4.
  - tc, dual-link : To configure the LVDS transmitter either
   as single-link or dual-link.
+ - tc, data-format: To configure the data formats
+   1 for VESA standard, 0 for JEIDA standard
  - vdd-supply: 1.2V LVDS Power Supply
  - vddio-supply: 1.8V IO Power Supply
  - stby-gpios: Standby pin, Low active 

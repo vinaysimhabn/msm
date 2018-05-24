@@ -160,6 +160,25 @@
 #define L2EN BIT(3)
 #define L3EN BIT(4)
 
+static const struct reg_sequence tc_fixed_registers[] = {
+	{ 0x013C, 0x00040006 },
+	{ 0x0114, 0x00000004 },
+	{ 0x0164, 0x00000003 },
+	{ 0x0168, 0x00000003 },
+	{ 0x016C, 0x00000003 },
+	{ 0x0170, 0x00000003 },
+};
+
+static const struct reg_sequence tc_vesa_data_format_registers[] = {
+	{ 0x0480, 0x03020100 },
+	{ 0x0484, 0x08050704 },
+	{ 0x0488, 0x0F0E0A09 },
+	{ 0x048C, 0x100D0C0B },
+	{ 0x0490, 0x12111716 },
+	{ 0x0494, 0x1B151413 },
+	{ 0x0498, 0x061A1918 },
+};
+
 static const char * const regulator_names[] = {
 	"vdd",
 	"vddio"
@@ -185,6 +204,7 @@ struct tc_data {
 	struct gpio_desc	*stby_gpio;
 	u32                     rev;
 	u8			dual_link; /* single-link or dual-link */
+	u8			data_format; /* VESA or JEIDA */
 };
 
 static inline struct tc_data *bridge_to_tc(struct drm_bridge *b)
@@ -311,12 +331,11 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, SYSRST, 0x000000FF);
 	mdelay(30);
 
-	d2l_write(tc, PPI_TX_RX_TA, 0x00040006); /* BTA */
-	d2l_write(tc, PPI_LPTXTIMECNT, 0x00000004);
-	d2l_write(tc, PPI_D0S_CLRSIPOCOUNT, 0x00000003);
-	d2l_write(tc, PPI_D1S_CLRSIPOCOUNT, 0x00000003);
-	d2l_write(tc, PPI_D2S_CLRSIPOCOUNT, 0x00000003);
-	d2l_write(tc, PPI_D3S_CLRSIPOCOUNT, 0x00000003);
+	ret = regmap_register_patch(tc->regmap,
+				    tc_fixed_registers,
+				    ARRAY_SIZE(tc_fixed_registers));
+	if (ret)
+		return;
 
 	val = ((L0EN << tc->num_dsi_lanes) - L0EN) | DSI_CLEN_BIT;
 	d2l_write(tc, PPI_LANEENABLE, val);
@@ -339,16 +358,15 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	d2l_write(tc, SYSRST, 0x00000004);
 	d2l_write(tc, LVPHY0, 0x00040006);
 
-	/*JEIDA DATA FORMAT default register values*/
-#ifdef VESA_DATA_FORMAT
-	d2l_write(tc, LVMX0003, 0x03020100);
-	d2l_write(tc, LVMX0407, 0x08050704);
-	d2l_write(tc, LVMX0811, 0x0F0E0A09);
-	d2l_write(tc, LVMX1215, 0x100D0C0B);
-	d2l_write(tc, LVMX1619, 0x12111716);
-	d2l_write(tc, LVMX2023, 0x1B151413);
-	d2l_write(tc, LVMX2427, 0x061A1918);
-#endif
+	if (tc->data_format == 1) { /* Data Format VESA=1 , JEIDA=0 */
+		ret = regmap_register_patch
+			(tc->regmap,
+			 tc_vesa_data_format_registers,
+			 ARRAY_SIZE(tc_vesa_data_format_registers));
+		if (ret)
+			return;
+	}
+
 	d2l_write(tc, VFUEN, 0x00000001);
 
 	val = (DIVIDE_BY_3 << LVCFG_PCLKDIV_OFFSET) | LVCFG_LVEN_BIT;
@@ -383,14 +401,13 @@ static int tc_connector_get_modes(struct drm_connector *connector)
 }
 
 static int tc_connector_mode_valid(struct drm_connector *connector,
-					struct drm_display_mode *mode)
+				   struct drm_display_mode *mode)
 {
 	struct tc_data *tc = connector_to_tc(connector);
 
-	/*Maximum pixel clock speed of 135 MHz for single-link
-		or 270 MHz for dual-link */
-	 if ((mode->clock > 135000) & (tc->dual_link == 0) ||
-		((mode->clock > 270000) & (tc->dual_link == 1)))
+	/* Maximum pixel clock speed 135MHz-single-link/270MHz-dual-link */
+	if ((mode->clock > 135000 && tc->dual_link == 0) ||
+	    (mode->clock > 270000 && tc->dual_link == 1))
 		return MODE_CLOCK_HIGH;
 
 	return MODE_OK;
@@ -421,9 +438,10 @@ static const struct drm_connector_funcs tc_connector_funcs = {
 int tc358775_parse_dt(struct device_node *np, struct tc_data *tc)
 {
 	u32 num_lanes;
-	u8 dual_link;
+	u8 dual_link, data_format;
 
 	of_property_read_u8(np, "tc,dual-link", &dual_link);
+	of_property_read_u8(np, "tc,data-format", &data_format);
 	of_property_read_u32(np, "tc,dsi-lanes", &num_lanes);
 
 	if (num_lanes < 1 || num_lanes > 4)
@@ -431,6 +449,7 @@ int tc358775_parse_dt(struct device_node *np, struct tc_data *tc)
 
 	tc->num_dsi_lanes = num_lanes;
 	tc->dual_link = dual_link;
+	tc->data_format = data_format;
 
 	tc->host_node = of_graph_get_remote_node(np, 0, 0);
 	if (!tc->host_node)
@@ -494,7 +513,7 @@ static int tc_bridge_attach(struct drm_bridge *bridge)
 	/* Create LVDS connector */
 	drm_connector_helper_add(&tc->connector, &tc_connector_helper_funcs);
 	ret = drm_connector_init(drm, &tc->connector, &tc_connector_funcs,
-					DRM_MODE_CONNECTOR_LVDS);
+				 DRM_MODE_CONNECTOR_LVDS);
 	if (ret)
 		return ret;
 
