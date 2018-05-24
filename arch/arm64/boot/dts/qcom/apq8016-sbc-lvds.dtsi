@@ -236,6 +236,7 @@
                                 reg = <0x0f>;
 
 				tc,dsi-lanes = <4>;
+				tc,dual-link = <0>;
 
                                 stby-gpio = <&msmgpio 99 GPIO_ACTIVE_LOW>;
                                 reset-gpio = <&msmgpio 72 GPIO_ACTIVE_LOW>;

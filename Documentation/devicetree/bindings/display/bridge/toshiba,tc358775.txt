@@ -5,6 +5,8 @@ Required properties:
  - reg: i2c address of the bridge, 0x0f
  - tc, dsi-lanes: Number of DSI data lanes connected to the DSI host. It should
   be one of 1, 2, 3 or 4.
+ - tc, dual-link : To configure the LVDS transmitter either
+  as single-link or dual-link.
  - vdd-supply: 1.2V LVDS Power Supply
  - vddio-supply: 1.8V IO Power Supply
  - stby-gpios: Standby pin, Low active 
@@ -33,6 +35,7 @@ Example:
 			reg = <0x0f>;
 
 			tc,dsi-lanes = <4>;
+			tc,dual-link = <0>;
 
 			vdd-supply = <&pm8916_l2>;
 			vddio-supply = <&pm8916_l6>;

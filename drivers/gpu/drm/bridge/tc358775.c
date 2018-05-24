@@ -301,8 +301,6 @@ static void tc_bridge_enable(struct drm_bridge *bridge)
 	htime2 = (hfpr << 16) + hsize;
 	vtime2 = (vfpr << 16) + vsize;
 
-	tc->dual_link = 0;
-
 	ret = regmap_read(tc->regmap, IDREG, &tc->rev);
 	if (ret) {
 		dev_err(tc->dev, "can not read device ID: %d\n", ret);
@@ -423,13 +421,16 @@ static const struct drm_connector_funcs tc_connector_funcs = {
 int tc358775_parse_dt(struct device_node *np, struct tc_data *tc)
 {
 	u32 num_lanes;
+	u8 dual_link;
 
+	of_property_read_u8(np, "tc,dual-link", &dual_link);
 	of_property_read_u32(np, "tc,dsi-lanes", &num_lanes);
 
 	if (num_lanes < 1 || num_lanes > 4)
 		return -EINVAL;
 
 	tc->num_dsi_lanes = num_lanes;
+	tc->dual_link = dual_link;
 
 	tc->host_node = of_graph_get_remote_node(np, 0, 0);
 	if (!tc->host_node)
