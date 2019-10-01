@@ -9,7 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
+#define DEBUG
 #include <linux/io.h>
 #include <linux/types.h>
 #include <linux/slimport.h>
@@ -1341,7 +1341,7 @@ static void hdmi_edid_get_display_mode(struct hdmi_edid_ctrl *edid_ctrl,
 	 */
 	if (!has480p)
 		hdmi_edid_add_sink_video_format(sink_data,
-			HDMI_VFRMT_640x480p60_4_3);
+			HDMI_VFRMT_800x480p66_4_3);
 } /* hdmi_edid_get_display_mode */
 
 int hdmi_edid_read(void *input)

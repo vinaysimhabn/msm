@@ -111,6 +111,7 @@ struct msm_hdmi_mode_timing_info {
 #define HDMI_VFRMT_1280x720p30_16_9	62
 #define HDMI_VFRMT_1920x1080p120_16_9	63
 #define HDMI_VFRMT_1920x1080p100_16_9	64
+#define HDMI_VFRMT_800x480p66_4_3	65
 /* Video Identification Codes from 65-127 are reserved for the future */
 #define HDMI_VFRMT_END			127
 
@@ -136,6 +137,9 @@ struct msm_hdmi_mode_timing_info {
 #define HDMI_VFRMT_640x480p60_4_3_TIMING				\
 	{HDMI_VFRMT_640x480p60_4_3, 640, 16, 96, 48, true,		\
 	 480, 10, 2, 33, true, 25200, 60000, false, true}
+#define HDMI_VFRMT_800x480p66_4_3_TIMING                                \
+	{HDMI_VFRMT_800x480p66_4_3, 800, 40, 48, 40, false,             \
+	480, 13, 3, 29, false, 32000, 66000, false, true}
 #define HDMI_VFRMT_720x480p60_4_3_TIMING				\
 	{HDMI_VFRMT_720x480p60_4_3, 720, 16, 62, 60, true,		\
 	 480, 9, 6, 30, true, 27030, 60000, false, true}
@@ -271,6 +275,8 @@ do {	\
 	}	\
 	if (__type & MSM_HDMI_MODES_DVI) {	\
 		MSM_HDMI_MODES_SET_TIMING(__lut,	\
+			HDMI_VFRMT_800x480p66_4_3);	\
+		MSM_HDMI_MODES_SET_TIMING(__lut,	\
 			HDMI_VFRMT_1024x768p60_4_3);	\
 		MSM_HDMI_MODES_SET_TIMING(__lut,	\
 			HDMI_VFRMT_1280x1024p60_5_4);	\
@@ -284,6 +290,7 @@ static inline const char *msm_hdmi_mode_2string(uint32_t mode)
 	switch (mode) {
 	case HDMI_VFRMT_UNKNOWN:		return "Unknown";
 	case HDMI_VFRMT_640x480p60_4_3:		return "640x480 p60 4/3";
+	case HDMI_VFRMT_800x480p66_4_3:		return "800x480 p66 4/3";
 	case HDMI_VFRMT_720x480p60_4_3:		return "720x480 p60 4/3";
 	case HDMI_VFRMT_720x480p60_16_9:	return "720x480 p60 16/9";
 	case HDMI_VFRMT_1280x720p60_16_9:	return "1280x 720 p60 16/9";

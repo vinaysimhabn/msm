@@ -10,7 +10,7 @@
  * GNU General Public License for more details.
  *
  */
-
+#define DEBUG
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/module.h>
